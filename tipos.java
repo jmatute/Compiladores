@@ -4,7 +4,9 @@ public enum tipos{
   BOOLEAN,
   VARIANT,
   INTEGER,
-  TYPE
+  TYPE,
+  FUNCTION,
+  ERROR
 }
 
 

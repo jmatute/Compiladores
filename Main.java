@@ -3,8 +3,12 @@ import java.io.*;
 import java.util.*;
 class Main {
     static boolean do_debug_parse = false;
+    
     static public void main(String[] args) throws java.io.IOException {
-		
+    
+    tabla Tabla_simbolos = new tabla(null,"global");
+    
+    System.out.println(tipos.STRING);		
     String archivo = args[0];
     
 
@@ -12,7 +16,7 @@ class Main {
 
     String arc = "tmp.txt";
     parser parser_obj = new parser(new prueba(new FileReader(archivo)));
-		
+		parser_obj.Tabla_Simbolos = Tabla_simbolos;
    
     System.out.println(mis);
     Symbol parse_tree = null;

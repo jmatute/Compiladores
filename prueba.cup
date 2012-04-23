@@ -5,6 +5,8 @@ parser code {:
     String errores = "";
     Boolean has_main = false;
     Boolean first_run = true; 
+    tabla Tabla_Simbolos;
+
     public void report_error(String message, Object info) {
       StringBuffer m = new StringBuffer("Error");
 		 if(info instanceof java_cup.runtime.Symbol) {
