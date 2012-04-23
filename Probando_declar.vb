@@ -10,5 +10,3 @@ Type prueba
   Dim x as integer
   esto as boolean
 end type
-
-End Sub

@@ -1,12 +1,12 @@
 'esto es un comentario
 'esto es otro seguido
 
-Dim hola dos, tres As Boolean, blah As Integer
 Dim blah As Boolean    'esto es otro comentario
+Dim e, f As Integer
 Dim esto As Integer
 Dim esto As Boolean
 Dim cual As Integer
-Dim As Otro
+Dim s As Otro
 Dim ahora As Boolean
 
 Function x (ByVal argumento1 As Integer, ByRef argumento2 As Boolean) As Integer 'cuarto comentario

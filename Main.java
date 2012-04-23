@@ -3,36 +3,54 @@ import java.io.*;
 import java.util.*;
 class Main {
     static boolean do_debug_parse = false;
-    
+    static HashMap<String,Tipo> seen_types; 
+   
     static public void main(String[] args) throws java.io.IOException {
-    
-    tabla Tabla_simbolos = new tabla(null,"global");
-    
-    System.out.println(tipos.STRING);		
-    String archivo = args[0];
-    
+    tabla Tabla_simbolos = new tabla(null,"global"); 
 
+    iniciarTipos();
+    String archivo = args[0];
     String mis = Main.recovery_string(archivo);
 
     String arc = "tmp.txt";
     parser parser_obj = new parser(new prueba(new FileReader(archivo)));
-		parser_obj.Tabla_Simbolos = Tabla_simbolos;
-   
+		parser_obj.first_time = true;
+    parser_obj.ambito = Tabla_simbolos;
+    parser_obj.seen_types = seen_types;
     System.out.println(mis);
     Symbol parse_tree = null;
 		try {
 			if (do_debug_parse)
 				 parse_tree = parser_obj.debug_parse();
 			else parse_tree = parser_obj.parse();
-      if (!parser_obj.has_main)
+    if (!parser_obj.has_main)
 			  System.out.println("No tiene main!!");
+        for( Registro reg:parser_obj.ambito.filas){
+        System.out.println(reg);
+      }
+      System.out.println(seen_types.get("prueba"));  
+      
+  
 		} catch (Exception e) {
       e.printStackTrace();
 			System.out.println("Horror");
 		}
+
+
  
     }
 
+
+
+
+  public static void iniciarTipos(){
+    seen_types = new HashMap<String,Tipo>(); 
+       seen_types.put("string",new Tipo("string"));
+       seen_types.put("char",new Tipo("char"));
+       seen_types.put("boolean",new Tipo("boolean"));
+       seen_types.put("integer",new Tipo("integer"));
+       seen_types.put("variant",new Tipo("variant"));
+  }
   static public String recovery_string(String path){
         File file = new File(path);
         String writeTo = "";

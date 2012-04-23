@@ -8,10 +8,11 @@ class tabla{
   public tabla(tabla padre,String ambi){
     this.parent = padre;
     this.ambito = ambi;
+    
   }
 
-  public void agregartabla(String id,Tipo t){
-    filas.add(new Registro(id,t) );    
+  public void agregarATabla(String id,Tipo t,int line){
+    filas.add(new Registro(id,t,line) );    
   }
 
   

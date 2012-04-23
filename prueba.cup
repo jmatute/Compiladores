@@ -1,11 +1,23 @@
 import java_cup.runtime.*;
-
+import java.util.HashMap;
 parser code {:
  
     String errores = "";
     Boolean has_main = false;
-    Boolean first_run = true; 
-    tabla Tabla_Simbolos;
+    Boolean first_time = true; 
+    tabla ambito;
+    HashMap<String,Tipo> seen_types;
+    Tipo tmp_tipo;
+
+    public int getline(Object info){
+		 if(info instanceof java_cup.runtime.Symbol) {
+			java_cup.runtime.Symbol s=((java_cup.runtime.Symbol)info);
+			   return s.left;
+      }
+      return -1;
+   
+} 
+
 
     public void report_error(String message, Object info) {
       StringBuffer m = new StringBuffer("Error");
@@ -36,15 +48,20 @@ parser code {:
 
 terminal DO, PARDER, PARIZQ, TO, AS, DIM, SEPARADOR, FIN, REF, SUB, FUNCTION;
 terminal IGUAL,LOOP,IF,THEN, ELSE, ELSEIF,END,FOR,NEXT,WHILE ,NUM,TRUE,FALSE;
-terminal String NAME,OPREL;
+terminal String NAME,OPREL,TIPO;
 terminal WRITE,WRITELN,INPUT;
-terminal POR,ENTRE,MAS,MENOS,ERROR,TIPO;
+terminal POR,ENTRE,MAS,MENOS,ERROR;
 terminal TYPE,EXIT, PUNTO,CADENA,NOT,SALTOCADENA;
-non terminal Object statement, metodo, programa,linea, declaracion,declar_var, vars,  statements, loop_for, do_loop, if_block;
+non terminal String vars;
+non terminal Tipo tipo;
+
+non terminal Object statement, metodo, programa,linea, declaracion,declar_var, statements, loop_for, do_loop, if_block;
 non terminal Object schrodingerArgument,asignacion,if_inner,list_declar,list_expressions, expression,argument, argumentlist, argumentlistHelper,bloque;
 non terminal Object variables_declar2,list_declar2,declaracion2,cadena_s,salir_param,variables_declar;
-non terminal Object retorno,tipo,salir_if,nombre,end_func,end_type,regresar,dectype,paramHelper,parametros,termino,factor,funcionCall,end_sub;
-non terminal Object rango,salir_loop,escribe,lee,continous,funcion;
+non terminal Object retorno,salir_if,nombre,end_func,end_type,regresar,dectype,paramHelper,parametros,termino,factor,funcionCall,end_sub;
+non terminal Object rango,salir_loop,escribe,lee,subfunc ,funcion;
+
+
 
 // COSAS QUE FALTAN AHORITA
 // manejo de errores
@@ -64,33 +81,34 @@ linea ::= declar_var FIN
 
 variables_declar ::= declar_var FIN;
 
-variables_declar2 ::= declaracion2 FIN;
-
-declaracion2 ::= DIM NAME AS tipo
-                | NAME AS tipo
-                | error {: parser.report_error("Se esperaba <id> As <tipo> ",sym.ERROR); :};
-
 
 /*----declaracion de variables----*/
 
 declar_var ::= DIM declaracion;
      
-declaracion ::= vars AS tipo SEPARADOR declaracion | 
-                vars AS tipo 
-                | error {: parser.report_error("Declaracion de variables: Se esperaba ID",sym.ERROR); :} ;
-vars ::= NAME 
-       | NAME SEPARADOR vars
-       | NAME error {: parser.report_error("Declaracion de variables: Se esperaba ,",sym.NAME); :};
+declaracion ::= vars:n1 AS tipo:t SEPARADOR declaracion  
+                    {:  if ( parser.first_time) parser.ambito.agregarATabla(n1,t,parser.getline(sym.ERROR) ); :} 
+              | vars:n1 AS tipo:t 
+                    {:  if (parser.first_time ) parser.ambito.agregarATabla(n1,t,parser.getline(sym.ERROR) ); :} 
+              | error {: parser.report_error("Declaracion de variables: Se esperaba ID",sym.ERROR); :} ;
+
+vars ::= NAME:n1 {:  RESULT = n1.toLowerCase() ; :}
+       | NAME:n1 SEPARADOR vars:n2 
+              {: if ( parser.first_time) parser.ambito.agregarATabla(n1.toLowerCase(),parser.seen_types.get("variant"), parser.getline(sym.SEPARADOR) ); RESULT = 
+n2.toLowerCase();:}
+       | NAME SEPARADOR error {: parser.report_error("Declaracion de variables: Se esperaba nombre",sym.NAME); :};
       
-tipo ::= TIPO | NAME;
+tipo ::= TIPO:n1 {: Tipo x = parser.seen_types.get(n1.toLowerCase());
+                    RESULT = x; :}
+       | NAME:n1 {: Tipo x = parser.seen_types.get(n1.toLowerCase());
+                    RESULT = x; :};
 /*--------------------------------*/
 
 /*---Declaracion de metodos-------*/
-metodo ::= SUB NAME:n1 argumentlist FIN end_sub FIN {: if (n1.equals("Main")) 
-                                                             parser.has_main = true; :}
-        |funcion;
+metodo ::= subfunc 
+         | funcion;
 
-
+subfunc ::=  SUB NAME:n1 argumentlist FIN end_sub FIN {: if (n1.toLowerCase().equals("main")) parser.has_main = true; :};
 
 funcion ::=  FUNCTION NAME argumentlist retorno FIN error FIN {: parser.report_error("oh wel",sym.ERROR); :}
           | FUNCTION NAME argumentlist retorno FIN end_func FIN
@@ -134,8 +152,6 @@ bloque ::= list_expressions
 list_declar ::= variables_declar list_declar 
                | variables_declar;
 
-list_declar2 ::= variables_declar2 list_declar2 
-               | variables_declar2;
 
 list_expressions ::= statement list_expressions | statement ;
 
@@ -285,5 +301,20 @@ rango ::= NAME IGUAL expression TO expression
 
 /*---- estructuras ---*/
 
-dectype ::= TYPE NAME FIN list_declar2 end_type FIN
-          | TYPE NAME FIN error end_type FIN {: parser.report_error(" estructura no puede estar vacia",sym.ERROR); :} ;
+
+
+dectype ::= TYPE NAME:n1  FIN {: parser.tmp_tipo = new Tipo(n1); :} list_declar2 end_type FIN {: parser.seen_types.put(n1,parser.tmp_tipo);
+                                                                                      :}
+          | TYPE NAME error end_type FIN {: parser.report_error(" estructura no puede estar vacia",sym.ERROR); :} ;
+
+
+list_declar2 ::= variables_declar2 list_declar2 
+               | variables_declar2;
+
+variables_declar2 ::= declaracion2 FIN;
+
+declaracion2 ::= DIM NAME:n1 AS tipo:t1 {: parser.tmp_tipo.agregar_atributos(n1,t1);  :}
+                | NAME:n1 AS tipo:t1 {: parser.tmp_tipo.agregar_atributos(n1,t1);   :}
+                | error {: parser.report_error("Se esperaba <id> As <tipo> ",sym.ERROR); :};
+
+
