@@ -2,14 +2,12 @@
 class Registro{
   String id;
   Tipo type;
-  int linea; 
-  public Registro(String nombre, Tipo t,int line){
+  public Registro(String nombre, Tipo t){
     this.id = nombre;
     this.type = t;
-    int linea = line;
   }
 
   public String toString(){
-    return id + " -- "+type.toString() + "-- "+ linea;
+    return id + " -- "+type.toString();
   }
 }

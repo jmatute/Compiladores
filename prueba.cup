@@ -1,18 +1,21 @@
 import java_cup.runtime.*;
-import java.util.HashMap;
+import java.util.*;
 parser code {:
  
     String errores = "";
     Boolean has_main = false;
     Boolean first_time = true; 
+    Boolean in_method = false;
     tabla ambito;
     HashMap<String,Tipo> seen_types;
     Tipo tmp_tipo;
-
+    ArrayList<Tipo> params; // = new ArrayList<Tipo>();
+ 
+  
     public int getline(Object info){
 		 if(info instanceof java_cup.runtime.Symbol) {
 			java_cup.runtime.Symbol s=((java_cup.runtime.Symbol)info);
-			   return s.left;
+          return s.left;
       }
       return -1;
    
@@ -48,23 +51,23 @@ parser code {:
 
 terminal DO, PARDER, PARIZQ, TO, AS, DIM, SEPARADOR, FIN, REF, SUB, FUNCTION;
 terminal IGUAL,LOOP,IF,THEN, ELSE, ELSEIF,END,FOR,NEXT,WHILE ,NUM,TRUE,FALSE;
-terminal String NAME,OPREL,TIPO;
+terminal String NAME,OPREL,TIPO,CADENA;
 terminal WRITE,WRITELN,INPUT;
 terminal POR,ENTRE,MAS,MENOS,ERROR;
-terminal TYPE,EXIT, PUNTO,CADENA,NOT,SALTOCADENA;
-non terminal String vars;
-non terminal Tipo tipo;
+terminal TYPE,EXIT, PUNTO,NOT,SALTOCADENA;
+non terminal String vars,cadena_s;
+non terminal Tipo tipo,funcionCall;
 
 non terminal Object statement, metodo, programa,linea, declaracion,declar_var, statements, loop_for, do_loop, if_block;
-non terminal Object schrodingerArgument,asignacion,if_inner,list_declar,list_expressions, expression,argument, argumentlist, argumentlistHelper,bloque;
-non terminal Object variables_declar2,list_declar2,declaracion2,cadena_s,salir_param,variables_declar;
-non terminal Object retorno,salir_if,nombre,end_func,end_type,regresar,dectype,paramHelper,parametros,termino,factor,funcionCall,end_sub;
-non terminal Object rango,salir_loop,escribe,lee,subfunc ,funcion;
+non terminal Object schrodingerArgument,asignacion,if_inner,list_declar,list_expressions,argument, argumentlist, argumentlistHelper,bloque;
+non terminal Object variables_declar2,list_declar2,declaracion2,salir_param,variables_declar;
+non terminal Object retorno,salir_if,end_func,end_type,regresar,dectype,paramHelper,parametros,end_sub;
+non terminal Object rango,salir_loop,subfunc ,funcion;
+non terminal Object fake_f,fake_s,fake_while,fake_if;
+
+non terminal Objeto lee, escribe, termino, factor, expression, nombre;
 
 
-
-// COSAS QUE FALTAN AHORITA
-// manejo de errores
 
 programa ::= FIN statements | statements | FIN |;
 
@@ -74,9 +77,9 @@ statements ::= linea statements
 
 
 linea ::= declar_var FIN
-          |metodo
-          |dectype
-          | error FIN {: parser.report_error(" Se esperaba declaracion de variables, metodos o estructuras",sym.ERROR); :};
+          | metodo
+          | dectype
+          | error FIN {: if(!parser.first_time) parser.report_error(" Se esperaba declaracion de variables, metodos o estructuras",sym.ERROR); :};
 
 
 variables_declar ::= declar_var FIN;
@@ -87,56 +90,157 @@ variables_declar ::= declar_var FIN;
 declar_var ::= DIM declaracion;
      
 declaracion ::= vars:n1 AS tipo:t SEPARADOR declaracion  
-                    {:  if ( parser.first_time) parser.ambito.agregarATabla(n1,t,parser.getline(sym.ERROR) ); :} 
+                    {:  
+                        //meter las variables globales dentro de la tabla
+                        if ( parser.first_time && !parser.in_method ){ boolean meter = parser.ambito.agregarATabla(n1,t );
+                            if(!meter ) parser.report_error("Variable <" + n1 +  "> ya ha sido declarada en este contexto",sym.ERROR);
+                        }
+                        
+                        if ( !parser.first_time && !parser.in_method ){
+                            Tipo tmp = parser.ambito.BuscarEnTabla(n1);
+                            Tipo extra = parser.seen_types.get(tmp.getName());
+                            if(extra== null )
+                            {  parser.report_error(" No existe el tipo " + t.getName() + " en la declaracion de variable " + n1,sym.AS); }
+                        } 
+                        if ( !parser.first_time && parser.in_method ){
+                            if( parser.seen_types.get(t.getName()) == null){
+                                parser.report_error("No existe el tipo" + t.getName() + " en la declaracion de la variable" + n1, t);
+                            }
+                            else{
+                                boolean meter = parser.ambito.agregarATabla(n1,t );
+                                if(!meter ) parser.report_error("Variable <" + n1 +  "> ya ha sido declarada en este contexto",sym.ERROR);
+                            }   
+                        } 
+                    :} 
               | vars:n1 AS tipo:t 
-                    {:  if (parser.first_time ) parser.ambito.agregarATabla(n1,t,parser.getline(sym.ERROR) ); :} 
-              | error {: parser.report_error("Declaracion de variables: Se esperaba ID",sym.ERROR); :} ;
+                    {:  if (parser.first_time && !parser.in_method ){boolean meter = parser.ambito.agregarATabla(n1,t ); 
+                            if(!meter ) parser.report_error("Variable <" + n1 +  "> ya ha sido declarada en este contexto",sym.ERROR);
+                        }
+                        if ( !parser.first_time && !parser.in_method ){
+                            Tipo tmp = parser.ambito.BuscarEnTabla(n1);
+                            Tipo extra = parser.seen_types.get(tmp.getName());
+                            if(extra== null )
+                            {  parser.report_error(" No existe tipo " + t.getName() + " en la declaracion de variable " + n1,sym.AS); }
+                        } 
+                        if ( !parser.first_time && parser.in_method ){
+                            if( parser.seen_types.get(t.getName()) == null){
+                                parser.report_error("No existe el tipo" + t.getName() + " en la declaracion de la variable" + n1, t);
+                            }
+                            else{
+                                boolean meter = parser.ambito.agregarATabla(n1,t );
+                                if(!meter ) parser.report_error("Variable <" + n1 +  "> ya ha sido declarada en este contexto",sym.ERROR);
+                            }   
+                        }
+            :} 
+              
+
+          | error {: if(!parser.first_time) parser.report_error("Declaracion de variables: Se esperaba ID",sym.ERROR); :} ;
+
+
+
 
 vars ::= NAME:n1 {:  RESULT = n1.toLowerCase() ; :}
-       | NAME:n1 SEPARADOR vars:n2 
-              {: if ( parser.first_time) parser.ambito.agregarATabla(n1.toLowerCase(),parser.seen_types.get("variant"), parser.getline(sym.SEPARADOR) ); RESULT = 
-n2.toLowerCase();:}
-       | NAME SEPARADOR error {: parser.report_error("Declaracion de variables: Se esperaba nombre",sym.NAME); :};
-      
-tipo ::= TIPO:n1 {: Tipo x = parser.seen_types.get(n1.toLowerCase());
-                    RESULT = x; :}
-       | NAME:n1 {: Tipo x = parser.seen_types.get(n1.toLowerCase());
-                    RESULT = x; :};
+        | NAME:n1 SEPARADOR vars:n2 
+               {: if ( parser.first_time ){ 
+                  boolean meter =  parser.ambito.agregarATabla(n1.toLowerCase(),parser.seen_types.get("variant") ); 
+                  if(!meter ) parser.report_error("Variable <" + n1 +  "> ya ha sido declarada en este contexto",sym.ERROR);
+                 
+                  }
+              RESULT = n2.toLowerCase(); :}
+        | NAME SEPARADOR error {: if(!parser.first_time) parser.report_error("Declaracion de variables: Se esperaba nombre",sym.NAME); :};
+    
+
+  
+tipo ::= TIPO:n1 {:
+                     Tipo x = parser.seen_types.get(n1.toLowerCase());
+                    RESULT = x;
+                  :}
+
+       | NAME:n1 {:
+                   Tipo x = parser.seen_types.get(n1.toLowerCase());
+                    if( x ==null)
+                    {
+                      x = new Tipo(n1.toLowerCase());
+                    }
+                    RESULT = x;   :};
 /*--------------------------------*/
 
 /*---Declaracion de metodos-------*/
 metodo ::= subfunc 
          | funcion;
 
-subfunc ::=  SUB NAME:n1 argumentlist FIN end_sub FIN {: if (n1.toLowerCase().equals("main")) parser.has_main = true; :};
-
-funcion ::=  FUNCTION NAME argumentlist retorno FIN error FIN {: parser.report_error("oh wel",sym.ERROR); :}
-          | FUNCTION NAME argumentlist retorno FIN end_func FIN
-          | FUNCTION error FIN {: parser.report_error("Se esperaba nombre de funcion",sym.ERROR); :}
-          | FUNCTION NAME error PARIZQ retorno FIN end_func FIN {: parser.report_error("error de parametros",sym.ERROR); :}  
-          | FUNCTION NAME error FIN end_func FIN {: parser.report_error("error de parametros",sym.ERROR); :} 
-          | FUNCTION NAME error {: parser.report_error("Error en firma de funcion",sym.ERROR); :};
+subfunc ::=  SUB fake_s argumentlist FIN end_sub FIN {: parser.ambito = parser.ambito.parent; :};
 
 
+funcion ::=   FUNCTION fake_f argumentlist retorno FIN end_func FIN {: parser.ambito = parser.ambito.parent;  :} 
+          |FUNCTION fake_f argumentlist retorno FIN error FIN {: if (!parser.first_time) parser.report_error("oh well",sym.ERROR); parser.ambito = parser.ambito.parent;:}
+          | FUNCTION error FIN {: if (!parser.first_time) parser.report_error("Se esperaba nombre de funcion",sym.ERROR); :}
+          | FUNCTION fake_f error PARIZQ retorno FIN end_func FIN {: if (!parser.first_time) parser.report_error("error de parametros",sym.ERROR); parser.ambito = parser.ambito.parent;:}  
+          | FUNCTION fake_f error FIN end_func FIN {: if (!parser.first_time) parser.report_error("error de parametros",sym.ERROR); parser.ambito = parser.ambito.parent; :} 
+          | FUNCTION fake_f error {: if (!parser.first_time) parser.report_error("Error en firma de funcion",sym.ERROR); parser.ambito = parser.ambito.parent;  :};
 
-retorno ::=  AS tipo
-            | error {: parser.report_error(" No existe tipo de retorno de funcion, se esperaba: As <Tipo>",sym.AS); :};
+
+fake_f ::= NAME:n1 {: if(parser.first_time){ 
+                         tabla nuevo_ambito = new tabla(parser.ambito,n1); parser.ambito.hijos.add(nuevo_ambito);
+                         parser.ambito = nuevo_ambito;
+                         parser.tmp_tipo = new Tipo(n1);
+                         parser.tmp_tipo.setTipoFinal(1);
+                      }
+                      else{
+                          
+                        for(tabla t:parser.ambito.hijos)
+                           {
+                                if( t.ambito.equals(n1))
+                                {  parser.ambito = t; 
+                                    break;}
+                           }
+                       }
+                    :};
+
+fake_s ::= NAME:n1 {: 
+                      if(parser.first_time){
+                      tabla nuevo_ambito = new tabla(parser.ambito,n1); 
+                      parser.ambito.hijos.add(nuevo_ambito);
+                      parser.ambito = nuevo_ambito;
+                      parser.tmp_tipo = new Tipo(n1);
+                      parser.tmp_tipo.setTipoFinal(2);
+                      if (n1.toLowerCase().equals("main")) parser.has_main = true; 
+                                }
+                      else{
+                          for(tabla t:parser.ambito.hijos)
+                           {
+                                if( t.ambito.equals(n1))
+                                {  parser.ambito = t; 
+                                    break;}
+                           }
+                       }
+
+
+                     :};
+
+retorno ::=  AS TIPO:t1 {:  
+                            if(parser.first_time){parser.tmp_tipo.metodo_var.add(parser.seen_types.get(t1)); 
+                                  parser.seen_types.put( parser.tmp_tipo.getName(), parser.tmp_tipo);
+                            }
+                        :}
+            | error {: if (!parser.first_time) parser.report_error(" No existe tipo de retorno de funcion, se esperaba: As <Tipo>",sym.AS); :}
+            | AS error {: if (!parser.first_time) parser.report_error(" Tipo de retorno invalido de funcion, se esperaba: As <char|integer|string|boolean>",sym.AS); :};
             
 
 end_sub ::= bloque END SUB
             | END SUB
-            | END error {: parser.report_error(" Se esperaba End Sub",sym.ERROR); :} ;
+            | END error {: if (!parser.first_time) parser.report_error(" Se esperaba End Sub",sym.ERROR); :} ;
 
 end_func ::=  bloque END FUNCTION
             | END FUNCTION
-            | bloque END error {: parser.report_error(" Se esperaba End Function", sym.ERROR); :} ;
+            | bloque END error {: if (!parser.first_time) parser.report_error(" Se esperaba End Function", sym.ERROR); :} ;
 
 end_type ::=  END TYPE
-            | END error {: parser.report_error("Se esperaba End Type",sym.ERROR); :};
+            | END error {: if (!parser.first_time) parser.report_error("Se esperaba End Type",sym.ERROR); :};
 
 regresar ::= EXIT SUB FIN
             | EXIT FUNCTION FIN 
-            | EXIT error {: parser.report_error(" Salida de metodos: se esperaba Exit Sub o Exit Function",sym.ERROR); :};
+            | EXIT error {: if (!parser.first_time) parser.report_error(" Salida de metodos: se esperaba Exit Sub o Exit Function",sym.ERROR); :};
 
 /*--------------------------------*/
 
@@ -158,144 +262,328 @@ list_expressions ::= statement list_expressions | statement ;
 statement ::= if_block | loop_for | do_loop | asignacion 
               |funcionCall FIN
               | escribe | lee
-              | NAME error {: parser.report_error(" Expresion no se esperaba.",sym.ERROR); :} ;
+              | NAME error {: if (!parser.first_time) parser.report_error(" Expresion no se esperaba.",sym.ERROR); :} ;
 
 escribe ::=   WRITE cadena_s FIN
              | WRITE nombre FIN
-             | WRITE error {: parser.report_error("Se esperaba cadena o variable",sym.WRITE);:}
+             | WRITE error {: if (!parser.first_time) parser.report_error("Se esperaba cadena o variable",sym.WRITE);:}
              | WRITELN nombre FIN
              | WRITELN cadena_s FIN
-             | WRITELN error {: parser.report_error("Se esperaba cadena o variable",sym.WRITELN); :};
+             | WRITELN error {: if (!parser.first_time) parser.report_error("Se esperaba cadena o variable",sym.WRITELN); :};
                
 lee ::= INPUT nombre FIN
-      | INPUT error {: parser.report_error(" Se esperaba variable",sym.ERROR); :} ;
+      | INPUT error {: if (!parser.first_time) parser.report_error(" Se esperaba variable",sym.ERROR); :} ;
 
    
-asignacion ::= nombre IGUAL expression FIN
-              | nombre IGUAL error FIN {: parser.report_error("No se puede asignar valor, error en expresion ",sym.ERROR); :};
+asignacion ::= nombre:n IGUAL expression:e FIN {: 
             
-nombre ::= NAME
-           | NAME PUNTO NAME
-           | NAME PUNTO error {: parser.report_error(" Error de <id> en asignacion ",sym.ERROR); :};
+            if(!parser.first_time)
+              if(!n.t.getName().equals(e.t.getName())){
+                System.out.println(e.SizeChain);  
+                if(!( n.t.getName().equals("char") && e.t.getName().equals("string") && e.SizeChain <= 1))
+                     parser.report_error("No se puede asignar " + e.t.getName() + " a variable de tipo " + n.t.getName(),e);      
+              }
+
+              :}
+              | nombre IGUAL error FIN {: if (!parser.first_time) parser.report_error("No se puede asignar valor, error en expresion ",sym.ERROR); :};
+            
+nombre ::= NAME:n1 {: 
+                    if(!parser.first_time){
+                      Tipo tmp = parser.ambito.BuscarEnTabla(n1);
+                      if( tmp.getName().equals("error"))
+                          parser.report_error("Variable " + n1 + " no fue declarada" , n1);
+                      RESULT = new Objeto(tmp);
+                      } 
+                    :} 
+          | NAME:n1 PUNTO NAME:n2 {:
+                      if(!parser.first_time){
+                        Tipo tmp = parser.ambito.BuscarEnTabla(n1);
+                        System.out.println("llega");
+                         if( tmp.getName().equals("error")){
+                              System.out.println(parser.ambito.toString());
+                              parser.report_error("Variable " + n1 + " no fue declarada/con punto" , n1);
+                         }
+                        else{
+                            tmp = parser.seen_types.get(tmp.getName()).atributos.get(n2);
+                            if( tmp == null){
+                                parser.report_error(n1 + " no cuenta con atributo " + n2,n2);
+                                RESULT = new Objeto(parser.seen_types.get("error"));
+                            }
+                            else{
+                                 System.out.println(n1 + "." + n2 + ":" + tmp.toString());
+                                 RESULT = new Objeto(tmp);
+                            }
+                          }              
+                        
+                        }
+                    :} 
+           | NAME PUNTO error {: if (!parser.first_time) parser.report_error(" Error de <id> en asignacion ",sym.ERROR); :};
 
 
-expression ::= expression MAS termino 
-              | expression MENOS termino
-              | termino
-              | expression IGUAL termino;
+expression ::= expression:e MAS termino:t 
+              {: 
+                if(!parser.first_time){
+                  if(e.t.getName().equals(t.t.getName()) && e.t.getName().equals("integer")){
+                    RESULT = new Objeto(parser.seen_types.get("integer"));
+                  } 
+                  else{
+
+                    parser.report_error(" No se puede sumar " + e.t.getName() + " con " + t.t.getName(),t);
+                    RESULT = new Objeto(parser.seen_types.get("integer"));
+                  }
+                }
+              :}
 
 
-termino ::= factor POR termino
-          | factor ENTRE termino
-          | factor OPREL termino
-          | factor;
+              | expression:e MENOS termino:t
+              {: 
+                if(!parser.first_time){
+                  if(e.t.getName().equals(t.t.getName()) && e.t.getName().equals("integer")){
+                    RESULT = new Objeto(parser.seen_types.get("integer"));
+                  } 
+                  else{
+
+                    parser.report_error(" No se puede restar " + e.t.getName() + " con " + t.t.getName(),t);
+                    RESULT = new Objeto(parser.seen_types.get("integer"));
+                  }
+                }
+              :}
+              | termino:t {: RESULT = t; :}
+              | expression:e IGUAL termino:t {: RESULT = new Objeto(parser.seen_types.get("boolean"));:};
+
+
+termino ::= factor:f POR termino:t
+              {: 
+                if(!parser.first_time){
+                  if(f.t.getName().equals(t.t.getName()) && f.t.getName().equals("integer")){
+                    RESULT = new Objeto(parser.seen_types.get("integer"));
+                  } 
+                  else{
+
+                    parser.report_error(" No se puede multiplicar " + f.t.getName() + " con " + t.t.getName(),t);
+                    RESULT = new Objeto(parser.seen_types.get("integer"));
+                  }
+                }
+              :}
+
+
+          | factor:f ENTRE termino:t
+              {: 
+                if(!parser.first_time){
+                  if(f.t.getName().equals(t.t.getName()) && f.t.getName().equals("integer")){
+                    RESULT = new Objeto(parser.seen_types.get("integer"));
+                  } 
+                  else{
+
+                    parser.report_error(" No se puede dividir " + f.t.getName() + " con " + t.t.getName(),t);
+                    RESULT = new Objeto(parser.seen_types.get("integer"));
+                  }
+                }
+              :}
+
+          | factor:f OPREL termino:t 
+              {: 
+                if(!parser.first_time){
+                  if(f.t.getName().equals(t.t.getName()) && f.t.getName().equals("integer")){
+                    RESULT = new Objeto(parser.seen_types.get("boolean"));
+                  } 
+                  else{
+
+                    parser.report_error(" No se puede comparar " + f.t.getName() + " con " + t.t.getName(),t);
+                    RESULT = new Objeto(parser.seen_types.get("boolean"));
+                  }
+                }
+              :}
+          | factor:f {: RESULT = f; :};
         
 
-factor ::= PARDER expression PARIZQ
-        | NOT factor 
-        | NUM
-        | NAME
-        | NAME PUNTO NAME  
-        | TRUE
-        | FALSE
-        | cadena_s
-        | funcionCall;
+factor ::= PARDER expression:e PARIZQ {: RESULT = e; :}
+        | NOT factor:f1 {: 
+                            if(!parser.first_time){
+                              if(!f1.t.getName().equals("boolean")) 
+                                  parser.report_error("Tipo no booleano en expresion",f1);
+                            }
+                        :}
 
-cadena_s ::= CADENA SALTOCADENA FIN cadena_s
-            |CADENA
-            |CADENA SALTOCADENA error {: parser.report_error("Se esperaba nueva cadena",sym.ERROR); :}; 
+        | NUM {: RESULT = new Objeto(parser.seen_types.get("integer")); :}
+        | nombre:n {: RESULT = n; :}
+        | TRUE {: RESULT=  new Objeto(parser.seen_types.get("boolean")); :}
+        | FALSE {: RESULT= new Objeto(parser.seen_types.get("boolean")); :}
+        | cadena_s:s {: Objeto t = new Objeto(parser.seen_types.get("string")); 
+                      String fin = "";
+                      for(char c:s.toCharArray()){
+                        if( c != '"')
+                           fin += c;
+                      }
+                    t.SizeChain= fin.length();
+                      RESULT = t;:}
+        | funcionCall:f {:  RESULT = new Objeto(f); :};
+
+cadena_s ::= CADENA:c SALTOCADENA FIN cadena_s:sig {: RESULT = c + sig;  :}
+            |CADENA:c {:
+                      RESULT = c; :}
+            |CADENA SALTOCADENA error {: if (!parser.first_time) parser.report_error("Se esperaba nueva cadena",sym.ERROR); :}; 
        
  
-funcionCall ::= NAME PARDER parametros ;
+funcionCall ::= NAME:n1 PARDER {: if(!parser.first_time) parser.params = new ArrayList<Tipo>();:} parametros {:
+                if(!parser.first_time){
+                  for( Tipo t :parser.params)
+                      System.out.println(t);    
+
+             boolean valido = true;
+                  Tipo tmp = parser.seen_types.get(n1);
+                if(tmp == null){
+                      parser.report_error(" No existe metodo con nombre " + n1 ,sym.ERROR);
+                      RESULT = parser.seen_types.get("error");
+                }
+                else{
+                  if (tmp.metodo_var.size() -1 != parser.params.size()){
+                    parser.report_error(" Error de argumentos,se esperaban: " + (tmp.metodo_var.size() -1) + " recibidos:" + parser.params.size(),sym.PARDER); 
+                  }
+                  else{
+                    for( int i = 0; i < parser.params.size();i++){
+                            if(!parser.params.get(i).getName().equals(tmp.metodo_var.get(i).getName())){
+                              parser.report_error(" Error de argumento " + i + " se esperaba " +  tmp.metodo_var.get(i).getName() + " recibio " + parser.params.get(i),sym.PARDER);
+                          }
+                    }
+                  }
+                  
+                   RESULT = tmp.metodo_var.get( tmp.metodo_var.size()-1);
+                }
+          }
+            :} ;
                
-parametros ::= expression paramHelper
+parametros ::= expression:e   {: if(!parser.first_time)parser.params.add(e.t);
+                   :} paramHelper
               | salir_param;
 
-paramHelper ::= SEPARADOR expression paramHelper
+paramHelper ::= SEPARADOR expression:e {:if(!parser.first_time)parser.params.add(e.t); :} paramHelper
               | salir_param;
 
-salir_param ::= PARIZQ; // | error {: parser.report_error("Se esperaba )",sym.ERROR); :}; 
+salir_param ::= PARIZQ; // | error {: if (!parser.first_time) parser.report_error("Se esperaba )",sym.ERROR); :}; 
 
 
 /*---Declaracion de argumentos ---*/
+
+
+
 argumentlist ::= PARDER schrodingerArgument;
 
 
 schrodingerArgument ::= argument argumentlistHelper
                       | PARIZQ
-                      | error {: parser.report_error("error de argumentos",sym.ERROR); :}; 
+                      | error {: if (!parser.first_time) parser.report_error("error de argumentos",sym.ERROR); :}; 
 
 
 argumentlistHelper ::= SEPARADOR argument argumentlistHelper 
                       | PARIZQ
-                      |error PARIZQ {: parser.report_error("error de argumentos",sym.ERROR); :}; 
-argument ::= REF NAME:n1 AS tipo
-            | REF NAME AS error {: parser.report_error(" error en argumento, se esperaba un tipo de dato",sym.ERROR); :}
-            | REF NAME  error {: parser.report_error(" error en argumento, se esperaba As <un tipo de dato>",sym.ERROR); :}
+                      |error PARIZQ {: if (!parser.first_time) parser.report_error("error de argumentos",sym.ERROR); :}; 
+
+argument ::= REF NAME:n1 AS tipo:t {:
+                                      if(parser.first_time){ 
+                                          parser.ambito.agregarATabla(n1,t);
+                                          parser.tmp_tipo.metodo_var.add(t);
+                                        }
+                                    :}
+            | REF NAME AS error {: if (!parser.first_time) parser.report_error(" error en argumento, se esperaba un tipo de dato",sym.ERROR); :}
+            | REF NAME  error {: if (!parser.first_time) parser.report_error(" error en argumento, se esperaba As <un tipo de dato>",sym.ERROR); :}
             
-            | REF error AS tipo {: parser.report_error(" error en argumento, no existe nombre de argumento",sym.NAME); :} 
-            | error NAME AS tipo{: parser.report_error("error en argumento, no existe tipo de referencia",sym.ERROR); :};
-/*---------------------------------*/
+            | REF error AS tipo {: if (!parser.first_time) parser.report_error(" error en argumento, no existe nombre de argumento",sym.NAME); :} 
+            | error NAME AS tipo{: if (!parser.first_time) parser.report_error("error en argumento, no existe tipo de referencia",sym.ERROR); :};
+
+
 
 
 /*---if-----*/
 //Ya revisado, bexpression es lo que hay que ver
 
-if_block ::= IF expression THEN FIN bloque if_inner
-            |IF expression FIN bloque if_inner
-            |IF expression THEN FIN if_inner
-            |IF expression FIN if_inner
-            |IF error FIN if_inner {: parser.report_error("Se esperaba expresion booleana",sym.ERROR); :}
-            |IF error THEN FIN if_inner {: parser.report_error("Se esperaba expresion booleana",sym.ERROR); :}
-            |IF error FIN bloque if_inner {: parser.report_error("Se esperaba expresion booleana",sym.ERROR); :}
-            |IF error THEN FIN bloque if_inner {: parser.report_error("Se esperaba expresion booleana",sym.ERROR); :};
+if_block ::= IF fake_if THEN FIN bloque if_inner
+            |IF fake_if FIN bloque if_inner
+            |IF fake_if THEN FIN if_inner
+            |IF fake_if FIN if_inner
+            |IF error FIN if_inner {: if (!parser.first_time) parser.report_error("Se esperaba expresion booleana",sym.ERROR); :}
+            |IF error THEN FIN if_inner {: if (!parser.first_time) parser.report_error("Se esperaba expresion booleana",sym.ERROR); :}
+            |IF error FIN bloque if_inner {: if (!parser.first_time) parser.report_error("Se esperaba expresion booleana",sym.ERROR); :}
+            |IF error THEN FIN bloque if_inner {: if (!parser.first_time) parser.report_error("Se esperaba expresion booleana",sym.ERROR); :};
       
 
 
 if_inner ::= salir_if FIN
             | ELSE FIN bloque salir_if FIN
             | ELSE FIN salir_if FIN
-            | ELSE error {: parser.report_error("Error en expresion Else",sym.ERROR); :}  
-            | ELSEIF expression FIN bloque if_inner
-            | ELSEIF expression THEN FIN bloque if_inner
-            | ELSEIF expression FIN if_inner
-            | ELSEIF expression THEN FIN if_inner
-            | ELSEIF error FIN if_inner {: parser.report_error("Se esperaba expresion booleana",sym.ERROR); :}
-            | ELSEIF error THEN FIN if_inner {: parser.report_error("Se esperaba expresion booleana",sym.ERROR); :}
-            | ELSEIF error FIN bloque if_inner {: parser.report_error("Se esperaba expresion booleana",sym.ERROR); :}
-            | ELSEIF error THEN FIN bloque if_inner {: parser.report_error("Se esperaba expresion booleana",sym.ERROR); :}
-            | ELSE FIN error salir_if FIN {: parser.report_error("Sentencia inesperada despues del Else",sym.ERROR); :}
-            | error salir_if{: parser.report_error("Error del bloque if, sentencia no esperada",sym.ERROR); :};
+            | ELSE error {: if (!parser.first_time) parser.report_error("Error en expresion Else",sym.ERROR); :}  
+            | ELSEIF fake_if FIN bloque if_inner
+            | ELSEIF fake_if THEN FIN bloque if_inner
+            | ELSEIF fake_if FIN if_inner
+            | ELSEIF fake_if THEN FIN if_inner
+            | ELSEIF error FIN if_inner {: if (!parser.first_time) parser.report_error("Se esperaba expresion booleana",sym.ERROR); :}
+            | ELSEIF error THEN FIN if_inner {: if (!parser.first_time) parser.report_error("Se esperaba expresion booleana",sym.ERROR); :}
+            | ELSEIF error FIN bloque if_inner {: if (!parser.first_time) parser.report_error("Se esperaba expresion booleana",sym.ERROR); :}
+            | ELSEIF error THEN FIN bloque if_inner {: if (!parser.first_time) parser.report_error("Se esperaba expresion booleana",sym.ERROR); :}
+            | ELSE FIN error salir_if FIN {: if (!parser.first_time) parser.report_error("Sentencia inesperada despues del Else",sym.ERROR); :}
+            | error salir_if{: if (!parser.first_time) parser.report_error("Error del bloque if, sentencia no esperada",sym.ERROR); :};
 
 salir_if ::= END IF
-            | END error {:parser.report_error("Se esperaba End If",sym.ERROR); :};
+            | END error {:if (!parser.first_time) parser.report_error("Se esperaba End If",sym.ERROR); :};
         
 /*--- do y for --*/
-do_loop ::= DO WHILE expression FIN bloque salir_loop
-            | DO WHILE expression FIN salir_loop
-            | DO error expression FIN bloque salir_loop {: parser.report_error("Se esperaba While <expresion booleana> ",sym.ERROR); :}
-            | DO error expression FIN salir_loop {: parser.report_error("Se esperaba While <expresion booleana> ",sym.ERROR); :}
-            | DO WHILE error FIN salir_loop {: parser.report_error("Se esperaba expresion booleana",sym.ERROR); :}
-            | DO WHILE error FIN bloque salir_loop {: parser.report_error("Se esperaba expresion booleana",sym.ERROR); :};
+
+
+fake_while ::= expression:e {:
+                if(!parser.first_time){
+                  if(!e.t.getName().equals("boolean")){
+                      parser.report_error("Se esperaba expression booleana dentro de ciclo while",e);
+                  }
+                }              
+  
+              :};
+
+fake_if ::= expression:e {:
+                if(!parser.first_time){
+                  if(!e.t.getName().equals("boolean")){
+                      parser.report_error("Se esperaba expression booleana dentro del If",e);
+                  }
+                }              
+  
+              :};
+
+
+
+do_loop ::= DO WHILE fake_while FIN bloque salir_loop
+            | DO WHILE fake_while FIN salir_loop
+            
+            | DO error fake_while FIN bloque salir_loop {: if (!parser.first_time) parser.report_error("Se esperaba While <expresion booleana> ",sym.ERROR); :}
+            | DO error fake_while FIN salir_loop {: if (!parser.first_time) parser.report_error("Se esperaba While <expresion booleana> ",sym.ERROR); :}
+            | DO WHILE error FIN salir_loop {: if (!parser.first_time) parser.report_error("Se esperaba expresion booleana",sym.ERROR); :}
+            | DO WHILE error FIN bloque salir_loop {: if (!parser.first_time) parser.report_error("Se esperaba expresion booleana",sym.ERROR); :};
 
  
 salir_loop ::= LOOP FIN
-              |error {: parser.report_error("se esperaba salida de while",sym.ERROR); :};
+              |error {: if (!parser.first_time) parser.report_error("se esperaba salida de while",sym.ERROR); :};
 
 loop_for ::= FOR rango FIN bloque NEXT FIN
             | FOR rango FIN NEXT FIN
-            | FOR error FIN NEXT FIN {: parser.report_error("Error en rango",sym.ERROR); :}
-            | FOR error FIN bloque NEXT FIN {: parser.report_error("Error en rango",sym.ERROR); :}
-            | FOR rango FIN error {: parser.report_error("Se esperaba un Next",sym.NEXT); :}
-            | FOR rango FIN bloque error {: parser.report_error("Se esperaba un Next",sym.NEXT); :}; 
+            | FOR error FIN NEXT FIN {: if (!parser.first_time) parser.report_error("Error en rango",sym.ERROR); :}
+            | FOR error FIN bloque NEXT FIN {: if (!parser.first_time) parser.report_error("Error en rango",sym.ERROR); :}
+            | FOR rango FIN error {: if (!parser.first_time) parser.report_error("Se esperaba un Next",sym.NEXT); :}
+            | FOR rango FIN bloque error {: if (!parser.first_time) parser.report_error("Se esperaba un Next",sym.NEXT); :}; 
     
-rango ::= NAME IGUAL expression TO expression
-        | NAME IGUAL TO error {: parser.report_error("Error de rangos, no existe valor inicial",sym.ERROR); :}
-        | NAME IGUAL error TO {: parser.report_error("Error de rangos, valor inicial y final",sym.ERROR); :} 
-        | NAME IGUAL error {: parser.report_error("Error de rangos/asignacion",sym.ERROR); :} 
-        | NAME IGUAL error TO error {: parser.report_error("Error de rangos",sym.ERROR); :}
-        | NAME IGUAL expression TO error {: parser.report_error("Se esperaba valor de final",sym.ERROR); :}
-        | NAME IGUAL error TO expression {: parser.report_error("Se esperaba valor de inicio",sym.ERROR); :}
+rango ::= NAME IGUAL expression:t1 TO expression:t2 
+          {:
+              if(!parser.first_time){
+                  if( !t1.t.getName().equals("integer"))
+                      parser.report_error("Rango no numerico en expression inicial",t1);
+                  if( !t2.t.getName().equals("integer"))
+                      parser.report_error("Rango no numerico en expression inicial",t2);
+              }
+
+          :}
+        | NAME IGUAL TO error {: if (!parser.first_time) parser.report_error("Error de rangos, no existe valor inicial",sym.ERROR); :}
+        | NAME IGUAL error TO {: if (!parser.first_time) parser.report_error("Error de rangos, valor inicial y final",sym.ERROR); :} 
+        | NAME IGUAL error {: if (!parser.first_time) parser.report_error("Error de rangos/asignacion",sym.ERROR); :} 
+        | NAME IGUAL error TO error {: if (!parser.first_time) parser.report_error("Error de rangos",sym.ERROR); :}
+        | NAME IGUAL expression TO error {: if (!parser.first_time) parser.report_error("Se esperaba valor de final",sym.ERROR); :}
+        | NAME IGUAL error TO expression {: if (!parser.first_time) parser.report_error("Se esperaba valor de inicio",sym.ERROR); :}
 
 ; 
 
@@ -303,9 +591,10 @@ rango ::= NAME IGUAL expression TO expression
 
 
 
-dectype ::= TYPE NAME:n1  FIN {: parser.tmp_tipo = new Tipo(n1); :} list_declar2 end_type FIN {: parser.seen_types.put(n1,parser.tmp_tipo);
-                                                                                      :}
-          | TYPE NAME error end_type FIN {: parser.report_error(" estructura no puede estar vacia",sym.ERROR); :} ;
+dectype ::= TYPE NAME:n1  FIN {: if(parser.first_time) {parser.tmp_tipo = new Tipo(n1); parser.tmp_tipo.setTipoFinal(3);} :} list_declar2 end_type FIN
+                              {: if(parser.first_time) {parser.seen_types.put(n1,parser.tmp_tipo);
+                                                        } :}
+          | TYPE NAME error end_type FIN {: if(!parser.first_time) parser.report_error(" estructura no puede estar vacia",sym.ERROR); :} ;
 
 
 list_declar2 ::= variables_declar2 list_declar2 
@@ -313,8 +602,16 @@ list_declar2 ::= variables_declar2 list_declar2
 
 variables_declar2 ::= declaracion2 FIN;
 
-declaracion2 ::= DIM NAME:n1 AS tipo:t1 {: parser.tmp_tipo.agregar_atributos(n1,t1);  :}
-                | NAME:n1 AS tipo:t1 {: parser.tmp_tipo.agregar_atributos(n1,t1);   :}
-                | error {: parser.report_error("Se esperaba <id> As <tipo> ",sym.ERROR); :};
+declaracion2 ::= DIM NAME:n1 AS tipo:t1 {: if(parser.first_time){ 
+                                                boolean meter = parser.tmp_tipo.agregar_atributos(n1,t1);
+                                                if(!meter) parser.report_error("No se puede agregar atributo de nombre " + n1 + " ya existe en este contexto",n1);
+                                         }  :}
+                | NAME:n1 AS tipo:t1 {: if( parser.first_time) {
+                                      boolean meter =parser.tmp_tipo.agregar_atributos(n1,t1);
+                                     if(!meter) parser.report_error("No se puede agregar atributo de nombre " + n1 + " ya existe en este contexto",n1);
+                      
+                   }
+        :}
+                | error {: if(!parser.first_time) parser.report_error("Se esperaba <id> As <tipo> ",sym.ERROR); :};
 
 

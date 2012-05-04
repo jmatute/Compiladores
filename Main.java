@@ -19,18 +19,32 @@ class Main {
     parser_obj.seen_types = seen_types;
     System.out.println(mis);
     Symbol parse_tree = null;
+
+    //Primera pasada
 		try {
 			if (do_debug_parse)
 				 parse_tree = parser_obj.debug_parse();
 			else parse_tree = parser_obj.parse();
     if (!parser_obj.has_main)
-			  System.out.println("No tiene main!!");
-        for( Registro reg:parser_obj.ambito.filas){
-        System.out.println(reg);
-      }
-      System.out.println(seen_types.get("prueba"));  
-      
-  
+			  System.out.println("No tiene main!!");    
+		} catch (Exception e) {
+      e.printStackTrace();
+			System.out.println("Horror");
+		}
+    
+    //Segunda pasada
+    //System.out.println(Tabla_simbolos.toString());
+
+    parser parser_obj2 = new parser(new prueba(new FileReader(archivo)));
+		parser_obj2.first_time = false;
+    parser_obj2.ambito = Tabla_simbolos;
+    parser_obj2.seen_types = seen_types;
+    System.out.println(mis);
+    parse_tree = null;
+		try {
+			if (do_debug_parse)
+				 parse_tree = parser_obj2.debug_parse();
+			else parse_tree = parser_obj2.parse();
 		} catch (Exception e) {
       e.printStackTrace();
 			System.out.println("Horror");
@@ -44,13 +58,17 @@ class Main {
 
 
   public static void iniciarTipos(){
-    seen_types = new HashMap<String,Tipo>(); 
+       seen_types = new HashMap<String,Tipo>(); 
        seen_types.put("string",new Tipo("string"));
        seen_types.put("char",new Tipo("char"));
        seen_types.put("boolean",new Tipo("boolean"));
        seen_types.put("integer",new Tipo("integer"));
        seen_types.put("variant",new Tipo("variant"));
+       seen_types.put("error", new Tipo("error"));
   }
+
+
+
   static public String recovery_string(String path){
         File file = new File(path);
         String writeTo = "";
