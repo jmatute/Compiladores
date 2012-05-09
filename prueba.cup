@@ -181,7 +181,8 @@ funcion ::=   FUNCTION fake_f argumentlist retorno FIN end_func FIN {: parser.am
 
 
 fake_f ::= NAME:n1 {: if(parser.first_time){ 
-                         tabla nuevo_ambito = new tabla(parser.ambito,n1); parser.ambito.hijos.add(nuevo_ambito);
+                         tabla nuevo_ambito = new tabla(parser.ambito,n1);
+                         parser.ambito.hijos.add(nuevo_ambito);
                          parser.ambito = nuevo_ambito;
                          parser.tmp_tipo = new Tipo(n1);
                          parser.tmp_tipo.setTipoFinal(1);
