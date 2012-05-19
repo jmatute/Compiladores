@@ -5,7 +5,7 @@ import java.util.*;
 class Tipo{
   private String name;
   private int TipoFinal;
-  
+  public TipoExtraVariant:  
 
   ArrayList<Tipo> metodo_var = new ArrayList<Tipo>();
   
