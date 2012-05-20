@@ -37,6 +37,7 @@ parser code {:
  
         errores += m;
         errores += "\n";
+       if(!first_time)
         System.out.println(m);
  }
 
@@ -57,7 +58,7 @@ terminal DO, PARDER, PARIZQ, TO, AS, DIM, SEPARADOR, FIN, REF, SUB, FUNCTION;
 terminal IGUAL,LOOP,IF,THEN, ELSE, ELSEIF,END,FOR,NEXT,WHILE ,NUM,TRUE,FALSE;
 terminal String NAME,OPREL,TIPO,CADENA;
 terminal WRITE,WRITELN,INPUT;
-terminal POR,ENTRE,MAS,MENOS,ERROR;
+terminal POR,ENTRE,MAS,MENOS,ERROR,RETURN;
 terminal TYPE,EXIT, PUNTO,NOT,SALTOCADENA;
 non terminal String vars,cadena_s;
 non terminal Tipo tipo,funcionCall;
@@ -243,6 +244,10 @@ retorno ::=  AS TIPO:t1 {:
                             if(parser.first_time){parser.tmp_tipo.metodo_var.add(parser.seen_types.get(t1)); 
                                   parser.seen_types.put( parser.tmp_tipo.getName(), parser.tmp_tipo);
                             }
+                            else{
+                                      Tipo x = parser.seen_types.get(t1.toLowerCase());
+                                      parser.ambito.agregarATabla(parser.ambito.ambito, x   );
+                            }
                         :}
             | error {: if (!parser.first_time) parser.report_error(" No existe tipo de retorno de funcion, se esperaba: As <Tipo>",sym.AS); :}
             | AS error {: if (!parser.first_time) parser.report_error(" Tipo de retorno invalido de funcion, se esperaba: As <char|integer|string|boolean>",sym.AS); :};
@@ -283,7 +288,11 @@ list_expressions ::= statement list_expressions | statement ;
 statement ::= if_block | loop_for | do_loop | asignacion 
               |funcionCall FIN
               | escribe | lee
+              | RETURN FIN
+              | RETURN expression FIN
               | NAME error {: if (!parser.first_time) parser.report_error(" Expresion no se esperaba.",sym.ERROR); :} ;
+
+
 
 escribe ::=   WRITE cadena_s FIN
              | WRITE nombre FIN
@@ -299,15 +308,30 @@ lee ::= INPUT nombre FIN
 asignacion ::= nombre:n IGUAL expression:e FIN:f {: 
             
             if(!parser.first_time)
-              if(!n.t.getName().equals(e.t.getName())){
-                if(!( n.t.getName().equals("char") && e.t.getName().equals("string") && e.SizeChain <= 1)){
+            {
+
+              
+              if(!n.t.getName().equals(e.t.getName()) && !n.t.getName().equals("variant") )
+              {
+                
+
+                if( e.t.getName().equals("variant") && e.t.TipoExtraVariant.getName().equals( n.t.getName() ) ){
+                
+                }
+                else if(!( n.t.getName().equals("char") && e.t.getName().equals("string") && e.SizeChain <= 1)){
                   int left = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
                   int right = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
-                  parser.report_semantic_error("No se puede asignar " +  e.t.getName() + " a variable de tipo " + n.t.getName(),left,right); 
-                      
-                  }      
-                }
+                  parser.report_semantic_error("No se puede asignar " +  e.t.getName() + " a variable de tipo " + n.t.getName(),left,right);       
+               }      
+                
 
+                
+              }
+              else if( n.t.getName().equals("variant") && !e.t.getName().equals("error")){
+                  n.t.TipoExtraVariant = e.t;
+              }
+               
+            }
               :}
               | nombre IGUAL error FIN {: if (!parser.first_time) parser.report_error("No se puede asignar valor, error en expresion ",sym.ERROR); :};
             
@@ -352,9 +376,22 @@ expression ::= expression:e MAS termino:t
                 int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
                 
                 if(!parser.first_time){
-                  if(e.t.getName().equals(t.t.getName()) && e.t.getName().equals("integer")){
+                  if(e.t.getName().equals(t.t.getName()) && e.t.getName().equals("integer") ){
                     RESULT = new Objeto(parser.seen_types.get("integer"));
-                  } 
+                  
+                  }
+                  else if( e.t.getName().equals(t.t.getName()) && e.t.getName().equals("variant") 
+                            && e.t.TipoExtraVariant.getName().equals(t.t.TipoExtraVariant.getName()) 
+                            && e.t.TipoExtraVariant.getName().equals("integer") ){
+                        RESULT = new Objeto(parser.seen_types.get("integer"));
+                  }
+                  else if( e.t.getName().equals("variant") && e.t.TipoExtraVariant.getName().equals("integer")  && t.t.getName().equals("integer")){
+                        RESULT = new Objeto(parser.seen_types.get("integer"));
+                  }
+                  else if( t.t.getName().equals("variant") && t.t.TipoExtraVariant.getName().equals("integer")  && e.t.getName().equals("integer")){
+                        RESULT = new Objeto(parser.seen_types.get("integer"));
+                  }
+  
                   else{
 
                     parser.report_semantic_error(" No se puede sumar " + e.t.getName() + " con " + t.t.getName(),linea,columna);
@@ -368,11 +405,24 @@ expression ::= expression:e MAS termino:t
               {: 
                 int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
                 int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
-
+                
                 if(!parser.first_time){
-                  if(e.t.getName().equals(t.t.getName()) && e.t.getName().equals("integer")){
+                  if(e.t.getName().equals(t.t.getName()) && e.t.getName().equals("integer") ){
                     RESULT = new Objeto(parser.seen_types.get("integer"));
-                  } 
+                  
+                  }
+                  else if( e.t.getName().equals(t.t.getName()) && e.t.getName().equals("variant") 
+                            && e.t.TipoExtraVariant.getName().equals(t.t.TipoExtraVariant.getName()) 
+                            && e.t.TipoExtraVariant.getName().equals("integer") ){
+                        RESULT = new Objeto(parser.seen_types.get("integer"));
+                  }
+                  else if( e.t.getName().equals("variant") && e.t.TipoExtraVariant.getName().equals("integer")  && t.t.getName().equals("integer")){
+                        RESULT = new Objeto(parser.seen_types.get("integer"));
+                  }
+                  else if( t.t.getName().equals("variant") && t.t.TipoExtraVariant.getName().equals("integer")  && e.t.getName().equals("integer")){
+                        RESULT = new Objeto(parser.seen_types.get("integer"));
+                  }
+  
                   else{
 
                     parser.report_semantic_error(" No se puede restar " + e.t.getName() + " con " + t.t.getName(),linea,columna);
@@ -386,13 +436,27 @@ expression ::= expression:e MAS termino:t
 
 termino ::= factor:f POR termino:t
               {: 
+                int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+                int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+                
                 if(!parser.first_time){
-                  if(f.t.getName().equals(t.t.getName()) && f.t.getName().equals("integer")){
+                  if(f.t.getName().equals(t.t.getName()) && f.t.getName().equals("integer") ){
                     RESULT = new Objeto(parser.seen_types.get("integer"));
-                  } 
+                  
+                  }
+                  else if( f.t.getName().equals(t.t.getName()) && f.t.getName().equals("variant") 
+                            && f.t.TipoExtraVariant.getName().equals(t.t.TipoExtraVariant.getName()) 
+                            && f.t.TipoExtraVariant.getName().equals("integer") ){
+                        RESULT = new Objeto(parser.seen_types.get("integer"));
+                  }
+                  else if( f.t.getName().equals("variant") && f.t.TipoExtraVariant.getName().equals("integer")  && t.t.getName().equals("integer")){
+                        RESULT = new Objeto(parser.seen_types.get("integer"));
+                  }
+                  else if( t.t.getName().equals("variant") && t.t.TipoExtraVariant.getName().equals("integer")  && f.t.getName().equals("integer")){
+                        RESULT = new Objeto(parser.seen_types.get("integer"));
+                  }
+  
                   else{
-                    int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
-                    int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
 
                     parser.report_semantic_error(" No se puede multiplicar " + f.t.getName() + " con " + t.t.getName(),linea,columna);
                     RESULT = new Objeto(parser.seen_types.get("integer"));
@@ -403,14 +467,28 @@ termino ::= factor:f POR termino:t
 
           | factor:f ENTRE termino:t
               {: 
+                int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+                int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+                
                 if(!parser.first_time){
-                  if(f.t.getName().equals(t.t.getName()) && f.t.getName().equals("integer")){
+                  if(f.t.getName().equals(t.t.getName()) && f.t.getName().equals("integer") ){
                     RESULT = new Objeto(parser.seen_types.get("integer"));
-                  } 
+                  
+                  }
+                  else if( f.t.getName().equals(t.t.getName()) && f.t.getName().equals("variant") 
+                            && f.t.TipoExtraVariant.getName().equals(t.t.TipoExtraVariant.getName()) 
+                            && f.t.TipoExtraVariant.getName().equals("integer") ){
+                        RESULT = new Objeto(parser.seen_types.get("integer"));
+                  }
+                  else if( f.t.getName().equals("variant") && f.t.TipoExtraVariant.getName().equals("integer")  && t.t.getName().equals("integer")){
+                        RESULT = new Objeto(parser.seen_types.get("integer"));
+                  }
+                  else if( t.t.getName().equals("variant") && t.t.TipoExtraVariant.getName().equals("integer")  && f.t.getName().equals("integer")){
+                        RESULT = new Objeto(parser.seen_types.get("integer"));
+                  }
+  
                   else{
 
-                    int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
-                    int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
                     parser.report_semantic_error(" No se puede dividir " + f.t.getName() + " con " + t.t.getName(),linea,columna);
                     RESULT = new Objeto(parser.seen_types.get("integer"));
                   }
@@ -419,13 +497,27 @@ termino ::= factor:f POR termino:t
 
           | factor:f OPREL termino:t 
               {: 
+                int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+                int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+                
                 if(!parser.first_time){
-                  if(f.t.getName().equals(t.t.getName()) && f.t.getName().equals("integer")){
+                  if(f.t.getName().equals(t.t.getName()) && f.t.getName().equals("integer") ){
                     RESULT = new Objeto(parser.seen_types.get("boolean"));
-                  } 
+                  
+                  }
+                  else if( f.t.getName().equals(t.t.getName()) && f.t.getName().equals("variant") 
+                            && f.t.TipoExtraVariant.getName().equals(t.t.TipoExtraVariant.getName()) 
+                            && f.t.TipoExtraVariant.getName().equals("integer") ){
+                        RESULT = new Objeto(parser.seen_types.get("boolean"));
+                  }
+                  else if( f.t.getName().equals("variant") && f.t.TipoExtraVariant.getName().equals("integer")  && t.t.getName().equals("integer")){
+                        RESULT = new Objeto(parser.seen_types.get("boolean"));
+                  }
+                  else if( t.t.getName().equals("variant") && t.t.TipoExtraVariant.getName().equals("integer")  && f.t.getName().equals("integer")){
+                        RESULT = new Objeto(parser.seen_types.get("boolean"));
+                  }
+  
                   else{
-                    int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
-                    int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
 
                     parser.report_semantic_error(" No se puede comparar " + f.t.getName() + " con " + t.t.getName(),linea,columna);
                     RESULT = new Objeto(parser.seen_types.get("boolean"));
@@ -437,11 +529,21 @@ termino ::= factor:f POR termino:t
 
 factor ::= PARDER expression:e PARIZQ {: RESULT = e; :}
         | NOT factor:f1 {: 
-                        int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
-                        int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
-                            if(!parser.first_time){
-                              if(!f1.t.getName().equals("boolean")) 
+                            int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+                            int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+                            
+                            if(!parser.first_time){ 
+                              if( f1.t.getName().equals("variant" ) && f1.t.TipoExtraVariant.getName().equals("boolean")){  
+                                RESULT = f1;
+                              }
+                              else if(!f1.t.getName().equals("boolean")  ) 
                                   parser.report_semantic_error("Tipo no booleano en expresion",linea,columna);
+                                  RESULT = new Objeto(parser.seen_types.get("boolean")); 
+                              RESULT = f1;  
+                            }
+                            else{
+                                RESULT = f1;    
+
                             }
                         :}
 
@@ -470,8 +572,6 @@ funcionCall ::= NAME:n1 PARDER {: if(!parser.first_time) parser.params = new Arr
              int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
              int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
                 if(!parser.first_time){
-                  for( Tipo t :parser.params)
-                      System.out.println(t);    
 
              boolean valido = true;
                   Tipo tmp = parser.seen_types.get(n1);
@@ -578,7 +678,7 @@ fake_while ::= expression:e {:
                     int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
 
                 if(!parser.first_time){
-                  if(!e.t.getName().equals("boolean")){
+                  if(!e.t.getName().equals("boolean") ){
                       parser.report_semantic_error("Se esperaba expression booleana dentro de ciclo while",linea,columna);
                   }
                 }              
@@ -623,7 +723,7 @@ rango ::= NAME IGUAL expression:t1 TO expression:t2
                int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
                 
               if(!parser.first_time){
-                  if( !t1.t.getName().equals("integer"))
+                  if( !t1.t.getName().equals("integer") )
                       parser.report_semantic_error("Rango no numerico en expression inicial",linea,columna);
                   if( !t2.t.getName().equals("integer"))
                       parser.report_semantic_error("Rango no numerico en expression inicial",linea,columna);
@@ -643,6 +743,7 @@ rango ::= NAME IGUAL expression:t1 TO expression:t2
 
 
 
+              
 dectype ::= TYPE NAME:n1  FIN {: if(parser.first_time) {parser.tmp_tipo = new Tipo(n1); parser.tmp_tipo.setTipoFinal(3);} :} list_declar2 end_type FIN
                               {: if(parser.first_time) {parser.seen_types.put(n1,parser.tmp_tipo);
                                                         } :}

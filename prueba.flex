@@ -55,10 +55,9 @@ loop = "Loop"
 num = ("-"?)[0-9]+
 comilla = "\""
 cadenah = ({comilla}([^\r\n]|[^\n])*{comilla})
-
+return = "return"
 cadena = {cadenah}(" "|"\t")*   
 saltoCadena = "&_"
-
 tipo = "Char"|"String"|"Integer"|"Boolean"|"Variant"
 true = "True"
 false = "False"
@@ -85,6 +84,7 @@ punto = "."
  {type} { return symbol(sym.TYPE); }
  {cadena} { return symbol(sym.CADENA,yytext());}
  {saltoCadena} { return symbol(sym.SALTOCADENA); }
+ {return} { return symbol(sym.RETURN);}
  {igual} { return symbol(sym.IGUAL,yytext());}
  {oprel} { return symbol(sym.OPREL,yytext());}
  {true} { return symbol(sym.TRUE);}
