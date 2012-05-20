@@ -59,7 +59,7 @@ cadenah = ({comilla}([^\r\n]|[^\n])*{comilla})
 cadena = {cadenah}(" "|"\t")*   
 saltoCadena = "&_"
 
-tipo = "Char"|"String"|"Integer"|"Boolean"
+tipo = "Char"|"String"|"Integer"|"Boolean"|"Variant"
 true = "True"
 false = "False"
 espacio = " "+|"\t"+

@@ -11,5 +11,3 @@ Sub main()
   a = "hola"
   cual.f = x
 end sub
-
-End Sub

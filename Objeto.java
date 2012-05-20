@@ -1,6 +1,6 @@
 
 
-public class Objeto{
+public class Objeto {
 
   Tipo t;
   int SizeChain;

@@ -47,6 +47,10 @@ parser code {:
 		System.exit(1);
     }
 
+    public void report_semantic_error(String error,int linea,int columna){
+      System.out.println("Error semantico en la linea: "  + (linea+1) + " columna: "  + (columna+1) + "\n" + error  );
+    }
+
 :}
 
 terminal DO, PARDER, PARIZQ, TO, AS, DIM, SEPARADOR, FIN, REF, SUB, FUNCTION;
@@ -92,44 +96,54 @@ declar_var ::= DIM declaracion;
 declaracion ::= vars:n1 AS tipo:t SEPARADOR declaracion  
                     {:  
                         //meter las variables globales dentro de la tabla
-                        if ( parser.first_time && !parser.in_method ){ boolean meter = parser.ambito.agregarATabla(n1,t );
-                            if(!meter ) parser.report_error("Variable <" + n1 +  "> ya ha sido declarada en este contexto",sym.ERROR);
+                        int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+                        int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+                        
+                    if ( parser.first_time && !parser.in_method ){ boolean meter = parser.ambito.agregarATabla(n1,t );
+                            if(!meter ) parser.report_semantic_error("Variable <" + n1 +  "> ya ha sido declarada en este contexto",linea,columna);
                         }
                         
                         if ( !parser.first_time && !parser.in_method ){
                             Tipo tmp = parser.ambito.BuscarEnTabla(n1);
                             Tipo extra = parser.seen_types.get(tmp.getName());
                             if(extra== null )
-                            {  parser.report_error(" No existe el tipo " + t.getName() + " en la declaracion de variable " + n1,sym.AS); }
+                            {  parser.report_semantic_error(" No existe el tipo " + t.getName() + " en la declaracion de variable " + n1,linea,columna); }
                         } 
                         if ( !parser.first_time && parser.in_method ){
                             if( parser.seen_types.get(t.getName()) == null){
-                                parser.report_error("No existe el tipo" + t.getName() + " en la declaracion de la variable" + n1, t);
+                                parser.report_semantic_error("No existe el tipo" + t.getName() + " en la declaracion de la variable" + n1, linea,columna);
                             }
                             else{
                                 boolean meter = parser.ambito.agregarATabla(n1,t );
-                                if(!meter ) parser.report_error("Variable <" + n1 +  "> ya ha sido declarada en este contexto",sym.ERROR);
+                                if(!meter ) parser.report_semantic_error("Variable <" + n1 +  "> ya ha sido declarada en este contexto",linea,columna);
+
                             }   
                         } 
                     :} 
               | vars:n1 AS tipo:t 
-                    {:  if (parser.first_time && !parser.in_method ){boolean meter = parser.ambito.agregarATabla(n1,t ); 
-                            if(!meter ) parser.report_error("Variable <" + n1 +  "> ya ha sido declarada en este contexto",sym.ERROR);
+                    {:  
+                      int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+                      int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+
+
+                      if (parser.first_time && !parser.in_method ){boolean meter = parser.ambito.agregarATabla(n1,t ); 
+                            if(!meter ) parser.report_semantic_error("Variable <" + n1 +  "> ya ha sido declarada en este contexto",linea,columna);
                         }
                         if ( !parser.first_time && !parser.in_method ){
                             Tipo tmp = parser.ambito.BuscarEnTabla(n1);
                             Tipo extra = parser.seen_types.get(tmp.getName());
                             if(extra== null )
-                            {  parser.report_error(" No existe tipo " + t.getName() + " en la declaracion de variable " + n1,sym.AS); }
+                            {  parser.report_semantic_error(" No existe tipo " + t.getName() + " en la declaracion de variable " + n1,linea,columna); }
                         } 
                         if ( !parser.first_time && parser.in_method ){
                             if( parser.seen_types.get(t.getName()) == null){
-                                parser.report_error("No existe el tipo" + t.getName() + " en la declaracion de la variable" + n1, t);
+                                parser.report_semantic_error("No existe el tipo" + t.getName() + " en la declaracion de la variable" + n1, linea,columna);
                             }
                             else{
                                 boolean meter = parser.ambito.agregarATabla(n1,t );
-                                if(!meter ) parser.report_error("Variable <" + n1 +  "> ya ha sido declarada en este contexto",sym.ERROR);
-                            }   
+                                if(!meter ) parser.report_semantic_error("Variable <" + n1 +  "> ya ha sido declarada en este contexto",linea,columna);
+                            
+                              }   
                         }
             :} 
               
@@ -141,13 +155,19 @@ declaracion ::= vars:n1 AS tipo:t SEPARADOR declaracion
 
 vars ::= NAME:n1 {:  RESULT = n1.toLowerCase() ; :}
         | NAME:n1 SEPARADOR vars:n2 
-               {: if ( parser.first_time ){ 
+           {: 
+              int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+              int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+          if ( parser.first_time ){ 
                   boolean meter =  parser.ambito.agregarATabla(n1.toLowerCase(),parser.seen_types.get("variant") ); 
-                  if(!meter ) parser.report_error("Variable <" + n1 +  "> ya ha sido declarada en este contexto",sym.ERROR);
+                  if(!meter ) parser.report_semantic_error("Variable <" + n1 +  "> ya ha sido declarada en este contexto",linea,columna);
                  
                   }
               RESULT = n2.toLowerCase(); :}
-        | NAME SEPARADOR error {: if(!parser.first_time) parser.report_error("Declaracion de variables: Se esperaba nombre",sym.NAME); :};
+        | NAME SEPARADOR error {:
+              int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+              int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+             if(!parser.first_time) parser.report_semantic_error("Declaracion de variables: Se esperaba nombre",linea,columna); :};
     
 
   
@@ -173,7 +193,7 @@ subfunc ::=  SUB fake_s argumentlist FIN end_sub FIN {: parser.ambito = parser.a
 
 
 funcion ::=   FUNCTION fake_f argumentlist retorno FIN end_func FIN {: parser.ambito = parser.ambito.parent;  :} 
-          |FUNCTION fake_f argumentlist retorno FIN error FIN {: if (!parser.first_time) parser.report_error("oh well",sym.ERROR); parser.ambito = parser.ambito.parent;:}
+          |FUNCTION fake_f argumentlist retorno FIN error FIN {: if (!parser.first_time) parser.report_error("Error en el bloque de funcion",sym.ERROR); parser.ambito = parser.ambito.parent;:}
           | FUNCTION error FIN {: if (!parser.first_time) parser.report_error("Se esperaba nombre de funcion",sym.ERROR); :}
           | FUNCTION fake_f error PARIZQ retorno FIN end_func FIN {: if (!parser.first_time) parser.report_error("error de parametros",sym.ERROR); parser.ambito = parser.ambito.parent;:}  
           | FUNCTION fake_f error FIN end_func FIN {: if (!parser.first_time) parser.report_error("error de parametros",sym.ERROR); parser.ambito = parser.ambito.parent; :} 
@@ -276,42 +296,47 @@ lee ::= INPUT nombre FIN
       | INPUT error {: if (!parser.first_time) parser.report_error(" Se esperaba variable",sym.ERROR); :} ;
 
    
-asignacion ::= nombre:n IGUAL expression:e FIN {: 
+asignacion ::= nombre:n IGUAL expression:e FIN:f {: 
             
             if(!parser.first_time)
               if(!n.t.getName().equals(e.t.getName())){
-                System.out.println(e.SizeChain);  
-                if(!( n.t.getName().equals("char") && e.t.getName().equals("string") && e.SizeChain <= 1))
-                     parser.report_error("No se puede asignar " + e.t.getName() + " a variable de tipo " + n.t.getName(),e);      
-              }
+                if(!( n.t.getName().equals("char") && e.t.getName().equals("string") && e.SizeChain <= 1)){
+                  int left = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+                  int right = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+                  parser.report_semantic_error("No se puede asignar " +  e.t.getName() + " a variable de tipo " + n.t.getName(),left,right); 
+                      
+                  }      
+                }
 
               :}
               | nombre IGUAL error FIN {: if (!parser.first_time) parser.report_error("No se puede asignar valor, error en expresion ",sym.ERROR); :};
             
-nombre ::= NAME:n1 {: 
+nombre ::= NAME:n1 {:
+                    int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+                    int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
                     if(!parser.first_time){
                       Tipo tmp = parser.ambito.BuscarEnTabla(n1);
                       if( tmp.getName().equals("error"))
-                          parser.report_error("Variable " + n1 + " no fue declarada" , n1);
+                          parser.report_semantic_error("Variable " + n1 + " no fue declarada" , linea,columna);
                       RESULT = new Objeto(tmp);
                       } 
                     :} 
           | NAME:n1 PUNTO NAME:n2 {:
+                      int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+                      int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
                       if(!parser.first_time){
                         Tipo tmp = parser.ambito.BuscarEnTabla(n1);
-                        System.out.println("llega");
                          if( tmp.getName().equals("error")){
-                              System.out.println(parser.ambito.toString());
-                              parser.report_error("Variable " + n1 + " no fue declarada/con punto" , n1);
-                         }
+                              parser.report_semantic_error("Variable " + n1 + " no fue declarada/con punto" , linea,columna);
+                              RESULT =  new Objeto(parser.seen_types.get("error"));
+                        }
                         else{
                             tmp = parser.seen_types.get(tmp.getName()).atributos.get(n2);
                             if( tmp == null){
-                                parser.report_error(n1 + " no cuenta con atributo " + n2,n2);
+                                parser.report_semantic_error(n1 + " no cuenta con atributo " + n2,linea,columna);
                                 RESULT = new Objeto(parser.seen_types.get("error"));
                             }
                             else{
-                                 System.out.println(n1 + "." + n2 + ":" + tmp.toString());
                                  RESULT = new Objeto(tmp);
                             }
                           }              
@@ -323,13 +348,16 @@ nombre ::= NAME:n1 {:
 
 expression ::= expression:e MAS termino:t 
               {: 
+                int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+                int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+                
                 if(!parser.first_time){
                   if(e.t.getName().equals(t.t.getName()) && e.t.getName().equals("integer")){
                     RESULT = new Objeto(parser.seen_types.get("integer"));
                   } 
                   else{
 
-                    parser.report_error(" No se puede sumar " + e.t.getName() + " con " + t.t.getName(),t);
+                    parser.report_semantic_error(" No se puede sumar " + e.t.getName() + " con " + t.t.getName(),linea,columna);
                     RESULT = new Objeto(parser.seen_types.get("integer"));
                   }
                 }
@@ -338,13 +366,16 @@ expression ::= expression:e MAS termino:t
 
               | expression:e MENOS termino:t
               {: 
+                int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+                int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+
                 if(!parser.first_time){
                   if(e.t.getName().equals(t.t.getName()) && e.t.getName().equals("integer")){
                     RESULT = new Objeto(parser.seen_types.get("integer"));
                   } 
                   else{
 
-                    parser.report_error(" No se puede restar " + e.t.getName() + " con " + t.t.getName(),t);
+                    parser.report_semantic_error(" No se puede restar " + e.t.getName() + " con " + t.t.getName(),linea,columna);
                     RESULT = new Objeto(parser.seen_types.get("integer"));
                   }
                 }
@@ -360,8 +391,10 @@ termino ::= factor:f POR termino:t
                     RESULT = new Objeto(parser.seen_types.get("integer"));
                   } 
                   else{
+                    int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+                    int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
 
-                    parser.report_error(" No se puede multiplicar " + f.t.getName() + " con " + t.t.getName(),t);
+                    parser.report_semantic_error(" No se puede multiplicar " + f.t.getName() + " con " + t.t.getName(),linea,columna);
                     RESULT = new Objeto(parser.seen_types.get("integer"));
                   }
                 }
@@ -376,7 +409,9 @@ termino ::= factor:f POR termino:t
                   } 
                   else{
 
-                    parser.report_error(" No se puede dividir " + f.t.getName() + " con " + t.t.getName(),t);
+                    int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+                    int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+                    parser.report_semantic_error(" No se puede dividir " + f.t.getName() + " con " + t.t.getName(),linea,columna);
                     RESULT = new Objeto(parser.seen_types.get("integer"));
                   }
                 }
@@ -389,8 +424,10 @@ termino ::= factor:f POR termino:t
                     RESULT = new Objeto(parser.seen_types.get("boolean"));
                   } 
                   else{
+                    int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+                    int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
 
-                    parser.report_error(" No se puede comparar " + f.t.getName() + " con " + t.t.getName(),t);
+                    parser.report_semantic_error(" No se puede comparar " + f.t.getName() + " con " + t.t.getName(),linea,columna);
                     RESULT = new Objeto(parser.seen_types.get("boolean"));
                   }
                 }
@@ -400,9 +437,11 @@ termino ::= factor:f POR termino:t
 
 factor ::= PARDER expression:e PARIZQ {: RESULT = e; :}
         | NOT factor:f1 {: 
+                        int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+                        int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
                             if(!parser.first_time){
                               if(!f1.t.getName().equals("boolean")) 
-                                  parser.report_error("Tipo no booleano en expresion",f1);
+                                  parser.report_semantic_error("Tipo no booleano en expresion",linea,columna);
                             }
                         :}
 
@@ -426,7 +465,10 @@ cadena_s ::= CADENA:c SALTOCADENA FIN cadena_s:sig {: RESULT = c + sig;  :}
             |CADENA SALTOCADENA error {: if (!parser.first_time) parser.report_error("Se esperaba nueva cadena",sym.ERROR); :}; 
        
  
-funcionCall ::= NAME:n1 PARDER {: if(!parser.first_time) parser.params = new ArrayList<Tipo>();:} parametros {:
+funcionCall ::= NAME:n1 PARDER {: if(!parser.first_time) parser.params = new ArrayList<Tipo>();:} parametros
+       {:
+             int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+             int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
                 if(!parser.first_time){
                   for( Tipo t :parser.params)
                       System.out.println(t);    
@@ -434,17 +476,17 @@ funcionCall ::= NAME:n1 PARDER {: if(!parser.first_time) parser.params = new Arr
              boolean valido = true;
                   Tipo tmp = parser.seen_types.get(n1);
                 if(tmp == null){
-                      parser.report_error(" No existe metodo con nombre " + n1 ,sym.ERROR);
+                      parser.report_semantic_error(" No existe metodo con nombre " + n1 ,linea,columna);
                       RESULT = parser.seen_types.get("error");
                 }
                 else{
                   if (tmp.metodo_var.size() -1 != parser.params.size()){
-                    parser.report_error(" Error de argumentos,se esperaban: " + (tmp.metodo_var.size() -1) + " recibidos:" + parser.params.size(),sym.PARDER); 
+                    parser.report_semantic_error(" Error de argumentos,se esperaban: " + (tmp.metodo_var.size() -1) + " recibidos:" + parser.params.size(),linea,columna); 
                   }
                   else{
                     for( int i = 0; i < parser.params.size();i++){
                             if(!parser.params.get(i).getName().equals(tmp.metodo_var.get(i).getName())){
-                              parser.report_error(" Error de argumento " + i + " se esperaba " +  tmp.metodo_var.get(i).getName() + " recibio " + parser.params.get(i),sym.PARDER);
+                              parser.report_semantic_error(" Error de argumento " + i + " se esperaba " +  tmp.metodo_var.get(i).getName() + " recibio " + parser.params.get(i),linea,columna);
                           }
                     }
                   }
@@ -531,18 +573,24 @@ salir_if ::= END IF
 
 
 fake_while ::= expression:e {:
+
+                    int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+                    int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+
                 if(!parser.first_time){
                   if(!e.t.getName().equals("boolean")){
-                      parser.report_error("Se esperaba expression booleana dentro de ciclo while",e);
+                      parser.report_semantic_error("Se esperaba expression booleana dentro de ciclo while",linea,columna);
                   }
                 }              
   
               :};
 
 fake_if ::= expression:e {:
+              int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+              int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
                 if(!parser.first_time){
                   if(!e.t.getName().equals("boolean")){
-                      parser.report_error("Se esperaba expression booleana dentro del If",e);
+                      parser.report_semantic_error("Se esperaba expression booleana dentro del If",linea,columna);
                   }
                 }              
   
@@ -571,11 +619,14 @@ loop_for ::= FOR rango FIN bloque NEXT FIN
     
 rango ::= NAME IGUAL expression:t1 TO expression:t2 
           {:
+               int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+               int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+                
               if(!parser.first_time){
                   if( !t1.t.getName().equals("integer"))
-                      parser.report_error("Rango no numerico en expression inicial",t1);
+                      parser.report_semantic_error("Rango no numerico en expression inicial",linea,columna);
                   if( !t2.t.getName().equals("integer"))
-                      parser.report_error("Rango no numerico en expression inicial",t2);
+                      parser.report_semantic_error("Rango no numerico en expression inicial",linea,columna);
               }
 
           :}
@@ -603,13 +654,21 @@ list_declar2 ::= variables_declar2 list_declar2
 
 variables_declar2 ::= declaracion2 FIN;
 
-declaracion2 ::= DIM NAME:n1 AS tipo:t1 {: if(parser.first_time){ 
-                                                boolean meter = parser.tmp_tipo.agregar_atributos(n1,t1);
-                                                if(!meter) parser.report_error("No se puede agregar atributo de nombre " + n1 + " ya existe en este contexto",n1);
-                                         }  :}
-                | NAME:n1 AS tipo:t1 {: if( parser.first_time) {
+declaracion2 ::= DIM NAME:n1 AS tipo:t1 {: 
+              int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+              int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+
+              if(parser.first_time){ 
+                      boolean meter = parser.tmp_tipo.agregar_atributos(n1,t1);
+                      if(!meter) parser.report_semantic_error("No se puede agregar atributo de nombre " + n1 + " ya existe en este contexto",linea,columna);
+                                      }  :}
+                | NAME:n1 AS tipo:t1 {: 
+              int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+              int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+
+                if( parser.first_time) {
                                       boolean meter =parser.tmp_tipo.agregar_atributos(n1,t1);
-                                     if(!meter) parser.report_error("No se puede agregar atributo de nombre " + n1 + " ya existe en este contexto",n1);
+                                     if(!meter) parser.report_semantic_error("No se puede agregar atributo de nombre " + n1 + " ya existe en este contexto",linea,columna);
                       
                    }
         :}
