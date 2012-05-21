@@ -13,17 +13,55 @@ class tabla{
   }
 
   public boolean agregarATabla(String id,Tipo t){
+    
     boolean meter = true;
     for(Registro r:filas) 
       if (r.id.equals(id))
         meter = false;
-    
     if(meter)
        filas.add(new Registro(id,t) );
     
     return meter;    
   }
 
+  public void CambiarExtraTipo(String id,Tipo nv_tipo){
+    tabla tmp;
+    tmp = this;
+    
+    while(true){
+      for(Registro r:tmp.filas){
+        if(r.id.equals(id))
+        {
+              r.ExtraTipoVariant = nv_tipo;            
+              return;
+        } 
+      }
+      if ( tmp.parent == null)
+        break;
+      tmp = tmp.parent;
+    }
+  }
+
+  public Tipo BuscarExtraTipo(String id){
+    tabla tmp;
+    tmp = this;
+    
+    while(true){
+      for(Registro r:tmp.filas){
+        if(r.id.equals(id))
+        {
+          return r.ExtraTipoVariant;
+        } 
+      }
+      if ( tmp.parent == null)
+        break;
+      tmp = tmp.parent;
+    }
+    
+    return new Tipo("error");
+
+
+  }
 
   public Tipo BuscarEnTabla(String id){
     tabla tmp;

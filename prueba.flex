@@ -115,5 +115,6 @@ punto = "."
  {separador} { return symbol(sym.SEPARADOR);}
  {id} { return symbol(sym.NAME,yytext());}
  {espacio} { }
- . { errores_flex += "Error: Caracter ilegal -> "+ yytext() + " linea " + (yyline+1) + " columna" + (yycolumn+1); }
+ . { System.out.println("Error: Caracter ilegal -> "+ yytext() + " linea " + (yyline+1) + " columna" + (yycolumn+1));
+      errores_flex += "Error: Caracter ilegal -> "+ yytext() + " linea " + (yyline+1) + " columna" + (yycolumn+1); }
 }

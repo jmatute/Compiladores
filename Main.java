@@ -82,8 +82,9 @@ class Main {
         try{
           Scanner scanner = new Scanner(file);
           while(scanner.hasNextLine()){
-            String linea =  scanner.nextLine() + "\n";
-            if (linea.contains("Function") && !linea.contains("End"))
+            String lin =  scanner.nextLine() + "\n";
+            String linea = lin.toLowerCase();
+            if (linea.contains("function") && !linea.contains("end"))
             {
                if(inSub){
                   linea = "End Sub\n" + linea; 
@@ -93,20 +94,20 @@ class Main {
                }
                inFunction = true;        
             }     
-            else if (linea.contains("Sub") && !linea.contains("End"))
+            else if (linea.contains("sub") && !linea.contains("end"))
             {
                 if(inFunction){
-                  linea = "End Function\n" + linea; 
+                  linea = "end function\n" + linea; 
                   errores += "Error en linea " + fila + " y en columna 1\n"+ "Error: se esperaba finalizacion de funcion  \n";
                   inFunction = false;
                 }
                 inSub = true;
             }          
-            else if (linea.contains("Function") && linea.contains("End"))
+            else if (linea.contains("function") && linea.contains("end"))
             {
               inFunction = false;
             }         
-            else if (linea.contains("Sub") && linea.contains("End"))
+            else if (linea.contains("sub") && linea.contains("end"))
             {
               inSub = false;
             }         
