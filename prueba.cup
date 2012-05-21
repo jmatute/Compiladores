@@ -697,7 +697,6 @@ fake_if ::= expression:e {:
               int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
                 if(!parser.first_time){
                   if(!e.t.getName().equals("boolean")){
-                      System.out.println(e.TipoExtraVariant.getName());
                       if(!( e.t.getName().equals("variant") && e.TipoExtraVariant.getName().equals("boolean")))
                          parser.report_semantic_error("Se esperaba expression booleana dentro del If",linea,columna);
                   }

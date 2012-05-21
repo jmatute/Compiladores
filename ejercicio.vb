@@ -3,7 +3,7 @@ type esto
   dim b as boolean
   dim c as variant
 end type
-$
+
 function otra(byval a as boolean) as integer
   otra = 5
 end function
@@ -24,9 +24,10 @@ Sub main()
   dim a as variant
   dim b as integer
   dim c as boolean
-  a= true
+  a = 4
   b = 3
-  b = 3 +1
+  b = 3 +1 + a
+  a = true
   a = not a
   if a then
     write "hello"
