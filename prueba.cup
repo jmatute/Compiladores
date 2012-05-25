@@ -6,11 +6,11 @@ parser code {:
     Boolean has_main = false;
     Boolean first_time = true; 
     Boolean in_method = false;
+    
     tabla ambito;
     HashMap<String,Tipo> seen_types;
     Tipo tmp_tipo;
     ArrayList<Objeto> params; // = new ArrayList<Tipo>();
- 
   
     public int getline(Object info){
 		 if(info instanceof java_cup.runtime.Symbol) {
@@ -62,7 +62,7 @@ terminal POR,ENTRE,MAS,MENOS,ERROR,RETURN;
 terminal TYPE,EXIT, PUNTO,NOT,SALTOCADENA;
 non terminal String vars,cadena_s;
 non terminal Tipo tipo,funcionCall;
-non terminal fin;
+non terminal fin,fake_end_sub;
 non terminal Object statement, metodo, programa,linea, declaracion,declar_var, statements, loop_for, do_loop, if_block;
 non terminal Object schrodingerArgument,asignacion,if_inner,list_declar,list_expressions,argument, argumentlist, argumentlistHelper,bloque;
 non terminal Object variables_declar2,list_declar2,declaracion2,salir_param,variables_declar;
@@ -98,11 +98,16 @@ declar_var ::= DIM declaracion;
 declaracion ::= vars:n1 AS tipo:t SEPARADOR declaracion  
                     {:  
                         //meter las variables globales dentro de la tabla
-                        int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
-                        int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+                        int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+                        int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
                         
-                    if ( parser.first_time && !parser.in_method ){ boolean meter = parser.ambito.agregarATabla(n1,t );
+                        if ( parser.first_time && !parser.in_method ){ 
+                            if( t.getName().equals("void"))
+                                parser.report_semantic_error("Variable <" + n1 +  "> no se puede declarar tipo void",linea,columna);
+                              else{
+                            boolean meter = parser.ambito.agregarATabla(n1,t ); 
                             if(!meter ) parser.report_semantic_error("Variable <" + n1 +  "> ya ha sido declarada en este contexto",linea,columna);
+                        }
                         }
                         
                         if ( !parser.first_time && !parser.in_method ){
@@ -124,12 +129,17 @@ declaracion ::= vars:n1 AS tipo:t SEPARADOR declaracion
                     :} 
               | vars:n1 AS tipo:t 
                     {:  
-                      int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
-                      int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+                      int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+                      int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
 
 
-                      if (parser.first_time && !parser.in_method ){boolean meter = parser.ambito.agregarATabla(n1,t ); 
+                      if (parser.first_time && !parser.in_method ){
+                            if( t.getName().equals("void"))
+                                parser.report_semantic_error("Variable <" + n1 +  "> no se puede declarar tipo void",linea,columna);
+                              else{
+                            boolean meter = parser.ambito.agregarATabla(n1,t ); 
                             if(!meter ) parser.report_semantic_error("Variable <" + n1 +  "> ya ha sido declarada en este contexto",linea,columna);
+                        }
                         }
                         if ( !parser.first_time && !parser.in_method ){
                             Tipo tmp = parser.ambito.BuscarEnTabla(n1);
@@ -158,8 +168,8 @@ declaracion ::= vars:n1 AS tipo:t SEPARADOR declaracion
 vars ::= NAME:n1 {:  RESULT = n1.toLowerCase() ; :}
         | NAME:n1 SEPARADOR vars:n2 
            {: 
-              int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
-              int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+              int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
+              int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
           if ( parser.first_time ){ 
                   boolean meter =  parser.ambito.agregarATabla(n1.toLowerCase(),parser.seen_types.get("variant") ); 
                   if(!meter ) parser.report_semantic_error("Variable <" + n1 +  "> ya ha sido declarada en este contexto",linea,columna);
@@ -167,8 +177,8 @@ vars ::= NAME:n1 {:  RESULT = n1.toLowerCase() ; :}
                   }
               RESULT = n2.toLowerCase(); :}
         | NAME SEPARADOR error {:
-              int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
-              int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
+              int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
+              int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
              if(!parser.first_time) parser.report_semantic_error("Declaracion de variables: Se esperaba nombre",linea,columna); :};
     
 
@@ -191,7 +201,23 @@ tipo ::= TIPO:n1 {:
 metodo ::= subfunc 
          | funcion;
 
-subfunc ::=  SUB fake_s argumentlist fin end_sub fin {: parser.ambito = parser.ambito.parent; :};
+subfunc ::=  SUB fake_s argumentlist fin fake_end_sub end_sub fin {: parser.ambito = parser.ambito.parent; :};
+            
+
+
+
+fake_end_sub ::=  {:  
+                            if(parser.first_time){parser.tmp_tipo.metodo_var.add(parser.seen_types.get("void")); 
+                                  parser.seen_types.put( parser.tmp_tipo.getName(), parser.tmp_tipo);
+                            }
+                            else{
+                                      Tipo x = parser.seen_types.get("void");
+                                      parser.ambito.agregarATabla(parser.ambito.ambito, x   );
+                            }
+                   :};
+
+
+
 
 
 funcion ::=   FUNCTION fake_f argumentlist retorno fin end_func fin {: parser.ambito = parser.ambito.parent;  :} 
@@ -200,6 +226,8 @@ funcion ::=   FUNCTION fake_f argumentlist retorno fin end_func fin {: parser.am
           | FUNCTION fake_f error PARIZQ retorno fin end_func fin {: if (!parser.first_time) parser.report_error("error de parametros",sym.ERROR); parser.ambito = parser.ambito.parent;:}  
           | FUNCTION fake_f error fin end_func fin {: if (!parser.first_time) parser.report_error("error de parametros",sym.ERROR); parser.ambito = parser.ambito.parent; :} 
           | FUNCTION fake_f error {: if (!parser.first_time) parser.report_error("Error en firma de funcion",sym.ERROR); parser.ambito = parser.ambito.parent;  :};
+
+
 
 
 fake_f ::= NAME:n1 {: if(parser.first_time){ 
@@ -289,24 +317,120 @@ list_expressions ::= statement list_expressions | statement ;
 statement ::= if_block | loop_for | do_loop | asignacion 
               |funcionCall fin
               | escribe | lee
-              | RETURN fin
-              | RETURN expression fin
+              | RETURN fin {: if(!parser.first_time){  
+                                int left = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+                                int right = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
+                                Tipo tmp = parser.seen_types.get(parser.ambito.ambito); 
+                                if (tmp.getTipoFinal() != 2)
+                                  parser.report_semantic_error("Metodo " + parser.ambito.ambito + " debe tener retorno no vacio " ,left,right);
+                           }:}
+              | RETURN expression:e fin {: if(!parser.first_time){
+                                int left = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+                                int right = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
+                                Tipo tmp = parser.seen_types.get(parser.ambito.ambito); 
+
+                                if (tmp.getTipoFinal() == 2)
+                                  parser.report_semantic_error("Procedimiento " + parser.ambito.ambito + " debe tener retorno vacio " ,left,right);
+                                if (tmp.getTipoFinal() == 1){
+                                    String ret = tmp.metodo_var.get( tmp.metodo_var.size() -1).getName();
+                                      
+                                    if( !e.t.getName().equals("variant") && !e.t.getName().equals(ret))
+                                        parser.report_semantic_error("Funcion " + parser.ambito.ambito + " debe tener retorno " + ret +
+                                                "recibe " + e.t.getName() ,left,right);
+                                  
+                                    if( e.t.getName().equals("variant")){
+                                          if(!e.TipoExtraVariant.getName().equals(ret))
+                                            parser.report_semantic_error("Funcion " + parser.ambito.ambito + " debe tener retorno " + ret +
+                                                      " recibe " + e.TipoExtraVariant.getName() ,left,right);
+                                        }    
+                                    }
+                                      
+
+                                }:}
               | NAME error {: if (!parser.first_time) parser.report_error(" Expresion no se esperaba.",sym.ERROR); :} ;
 
 
 
 escribe ::=   WRITE cadena_s fin
-             | WRITE nombre fin
+             | WRITE nombre:n {: 
+                      if (!parser.first_time && n.error_msg != null){
+                        parser.report_semantic_error(n.error_msg,n.line,n.column);
+                      }
+                      else if (!parser.first_time){
+                          if(n.t.getName().equals("variant")){
+                             if( !( n.TipoExtraVariant.getName().equals("char") || n.TipoExtraVariant.getName().equals("string") || n.TipoExtraVariant.getName().equals("integer")  ) ){
+                             int left = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+                             int right = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
+                             parser.report_semantic_error("Variable debe ser <string|char|integer> para ser escrita",left,right); 
+                          }
+
+                        
+                          }
+                          else if( !( n.t.getName().equals("char") || n.t.getName().equals("string") || n.t.getName().equals("integer")  ) ){
+                             int left = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+                             int right = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
+                             parser.report_semantic_error("Variable debe ser <string|char|integer> para ser escrita",left,right); 
+                          }
+                      }
+             :} fin
              | WRITE error {: if (!parser.first_time) parser.report_error("Se esperaba cadena o variable",sym.WRITE);:}
-             | WRITELN nombre fin
+             | WRITELN nombre:n {:
+                      if (!parser.first_time && n.error_msg != null){
+                        parser.report_semantic_error(n.error_msg,n.line,n.column);
+                      }
+                      else if (!parser.first_time){
+                          if(n.t.getName().equals("variant")){
+                             if( !( n.TipoExtraVariant.getName().equals("char") || n.TipoExtraVariant.getName().equals("string") || n.TipoExtraVariant.getName().equals("integer")  ) ){
+                             int left = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+                             int right = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
+                             parser.report_semantic_error("Variable debe ser <string|char|integer> para ser escrita",left,right); 
+                          }
+
+                        
+                          }
+                          else if( !( n.t.getName().equals("char") || n.t.getName().equals("string") || n.t.getName().equals("integer")  ) ){
+                             int left = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+                             int right = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
+                             parser.report_semantic_error("Variable debe ser <string|char|integer> para ser escrita",left,right); 
+                          }
+                      }
+            :}fin
              | WRITELN cadena_s fin
              | WRITELN error {: if (!parser.first_time) parser.report_error("Se esperaba cadena o variable",sym.WRITELN); :};
                
-lee ::= INPUT nombre fin
+lee ::= INPUT nombre:n {:
+
+                      if (!parser.first_time && n.error_msg != null){
+                        parser.report_semantic_error(n.error_msg,n.line,n.column);
+                      }
+                      else if (!parser.first_time){
+                          if(n.t.getName().equals("variant")){
+                             if( !( n.TipoExtraVariant.getName().equals("char") || n.TipoExtraVariant.getName().equals("string") || n.TipoExtraVariant.getName().equals("integer")  ) ){
+                             int left = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+                             int right = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
+                             parser.report_semantic_error("Variable debe ser <string|char|integer> para ser leida",left,right); 
+                          }
+
+                        
+                          }
+                          else if( !( n.t.getName().equals("char") || n.t.getName().equals("string") || n.t.getName().equals("integer")  ) ){
+                             int left = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+                             int right = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
+                             parser.report_semantic_error("Variable debe ser <string|char|integer> para ser leida",left,right); 
+                          }
+                      }
+       :}fin
       | INPUT error {: if (!parser.first_time) parser.report_error(" Se esperaba variable",sym.ERROR); :} ;
 
    
-asignacion ::= nombre:n IGUAL expression:e fin:f {: 
+asignacion ::= nombre:n IGUAL {:
+                      
+                  if(!parser.first_time && n.error_msg != null){
+                      parser.ambito.agregarATabla(n.id.toLowerCase(),parser.seen_types.get("variant") );
+                      n.t = parser.seen_types.get("variant");  
+                }
+
+            :} expression:e fin:f {: 
             
             if(!parser.first_time)
             {
@@ -320,8 +444,8 @@ asignacion ::= nombre:n IGUAL expression:e fin:f {:
                 
                 }
                 else if(!( n.t.getName().equals("char") && e.t.getName().equals("string") && e.SizeChain <= 1)){
-                  int left = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
-                  int right = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+                  int left = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+                  int right = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
                   parser.report_semantic_error("No se puede asignar " +  e.t.getName() + " a variable de tipo " + n.t.getName(),left,right);       
                }      
                 
@@ -329,28 +453,38 @@ asignacion ::= nombre:n IGUAL expression:e fin:f {:
                 
               }
               else if( n.t.getName().equals("variant") && !e.t.getName().equals("error")){
-                  parser.ambito.CambiarExtraTipo(n.id,e.t); 
+                  int left = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+                  int right = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
+                    if (e.t.getName().equals("void")){
+                        parser.report_semantic_error("No se puede asignar tipo void",left,right);
+                    }
+                    else parser.ambito.CambiarExtraTipo(n.id,e.t); 
                 }
                
             }
               :}
               | nombre IGUAL error fin {: if (!parser.first_time) parser.report_error("No se puede asignar valor, error en expresion ",sym.ERROR); :};
             
+
 nombre ::= NAME:n1 {:
-                    int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
-                    int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+                    int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+                    int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
                     if(!parser.first_time){
                       Tipo tmp = parser.ambito.BuscarEnTabla(n1);
-                      if( tmp.getName().equals("error"))
-                          parser.report_semantic_error("Variable " + n1 + " no fue declarada" , linea,columna);
                       RESULT = new Objeto(tmp);
-                      RESULT.id = n1;
+                      
+                      if( tmp.getName().equals("error"))
+                      {   RESULT.error_msg = "Variable " + n1 + " no fue declarada"; 
+                          RESULT.line = linea;
+                          RESULT.column = columna;
+                      }
+                       RESULT.id = n1;
                       RESULT.TipoExtraVariant = parser.ambito.BuscarExtraTipo(n1);
                       } 
                     :} 
           | NAME:n1 PUNTO NAME:n2 {:
-                      int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
-                      int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+                      int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+                      int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
                       if(!parser.first_time){
                         Tipo tmp = parser.ambito.BuscarEnTabla(n1);
                          if( tmp.getName().equals("error")){
@@ -375,8 +509,8 @@ nombre ::= NAME:n1 {:
 
 expression ::= expression:e MAS termino:t 
               {: 
-                int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
-                int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+                int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+                int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
                 
                 if(!parser.first_time){
                   if(e.t.getName().equals(t.t.getName()) && e.t.getName().equals("integer") ){
@@ -406,8 +540,8 @@ expression ::= expression:e MAS termino:t
 
               | expression:e MENOS termino:t
               {: 
-                int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
-                int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+                int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+                int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
                 
                 if(!parser.first_time){
                   if(e.t.getName().equals(t.t.getName()) && e.t.getName().equals("integer") ){
@@ -439,8 +573,8 @@ expression ::= expression:e MAS termino:t
 
 termino ::= factor:f POR termino:t
               {: 
-                int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
-                int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+                int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+                int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
                 
                 if(!parser.first_time){
                   if(f.t.getName().equals(t.t.getName()) && f.t.getName().equals("integer") ){
@@ -470,8 +604,8 @@ termino ::= factor:f POR termino:t
 
           | factor:f ENTRE termino:t
               {: 
-                int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
-                int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+                int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+                int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
                 
                 if(!parser.first_time){
                   if(f.t.getName().equals(t.t.getName()) && f.t.getName().equals("integer") ){
@@ -500,8 +634,8 @@ termino ::= factor:f POR termino:t
 
           | factor:f OPREL termino:t 
               {: 
-                int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
-                int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+                int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+                int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
                 
                 if(!parser.first_time){
                   if(f.t.getName().equals(t.t.getName()) && f.t.getName().equals("integer") ){
@@ -532,8 +666,8 @@ termino ::= factor:f POR termino:t
 
 factor ::= PARDER expression:e PARIZQ {: RESULT = e; :}
         | NOT factor:f1 {: 
-                            int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
-                            int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+                            int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+                            int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
                             
                             if(!parser.first_time){ 
                               if( f1.t.getName().equals("variant" ) && f1.TipoExtraVariant.getName().equals("boolean")){  
@@ -551,7 +685,12 @@ factor ::= PARDER expression:e PARIZQ {: RESULT = e; :}
                         :}
 
         | NUM {: RESULT = new Objeto(parser.seen_types.get("integer")); :}
-        | nombre:n {: RESULT = n; :}
+        | nombre:n {: RESULT = n; 
+                      if (!parser.first_time && n.error_msg != null){
+                        parser.report_semantic_error(n.error_msg,n.line,n.column);
+                      }
+                  :}
+        | MENOS factor:f {: RESULT = f; :}
         | TRUE {: RESULT=  new Objeto(parser.seen_types.get("boolean")); :}
         | FALSE {: RESULT= new Objeto(parser.seen_types.get("boolean")); :}
         | cadena_s:s {: Objeto t = new Objeto(parser.seen_types.get("string")); 
@@ -572,8 +711,8 @@ cadena_s ::= CADENA:c SALTOCADENA fin cadena_s:sig {: RESULT = c + sig;  :}
  
 funcionCall ::= NAME:n1 PARDER {: if(!parser.first_time) parser.params = new ArrayList<Objeto>();:} parametros
        {:
-             int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
-             int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+             int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+             int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
                 if(!parser.first_time){
 
                boolean valido = true;
@@ -583,7 +722,7 @@ funcionCall ::= NAME:n1 PARDER {: if(!parser.first_time) parser.params = new Arr
                       RESULT = parser.seen_types.get("error");
                 }
                 else{
-                  if (tmp.metodo_var.size() -1 != parser.params.size()){
+                  if (tmp.metodo_var.size()-1 != parser.params.size() ){
                     parser.report_semantic_error(" Error de argumentos,se esperaban: " + (tmp.metodo_var.size() -1) + " recibidos:" + parser.params.size(),linea,columna); 
                   }
                   else{
@@ -681,8 +820,8 @@ salir_if ::= END IF
 
 fake_while ::= expression:e {:
 
-                    int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
-                    int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+                    int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+                    int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
 
                 if(!parser.first_time){
                   if(!e.t.getName().equals("boolean") ){
@@ -693,8 +832,8 @@ fake_while ::= expression:e {:
               :};
 
 fake_if ::= expression:e {:
-              int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
-              int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+              int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+              int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
                 if(!parser.first_time){
                   if(!e.t.getName().equals("boolean")){
                       if(!( e.t.getName().equals("variant") && e.TipoExtraVariant.getName().equals("boolean")))
@@ -727,8 +866,8 @@ loop_for ::= FOR rango fin bloque NEXT fin
     
 rango ::= NAME IGUAL expression:t1 TO expression:t2 
           {:
-               int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
-               int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+               int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+               int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
                 
               if(!parser.first_time){
                   if( !t1.t.getName().equals("integer") )
@@ -764,21 +903,29 @@ list_declar2 ::= variables_declar2 list_declar2
 variables_declar2 ::= declaracion2 fin;
 
 declaracion2 ::= DIM NAME:n1 AS tipo:t1 {: 
-              int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
-              int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+              int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+              int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
 
               if(parser.first_time){ 
-                      boolean meter = parser.tmp_tipo.agregar_atributos(n1,t1);
-                      if(!meter) parser.report_semantic_error("No se puede agregar atributo de nombre " + n1 + " ya existe en este contexto",linea,columna);
-                                      }  :}
+                        if( t1.getName().equals("void"))
+                            parser.report_semantic_error("Variable <" + n1 +  "> no se puede declarar tipo void",linea,columna);
+                      
+                      else { boolean meter = parser.tmp_tipo.agregar_atributos(n1,t1);
+                      
+      if(!meter) parser.report_semantic_error("No se puede agregar atributo de nombre " + n1 + " ya existe en este contexto",linea,columna);
+                                     } }  :}
                 | NAME:n1 AS tipo:t1 {: 
-              int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).left;
-              int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top-1)).right;
+              int linea = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).left;
+              int columna = ((java_cup.runtime.Symbol)CUP$parser$stack.elementAt(CUP$parser$top)).right;
 
                 if( parser.first_time) {
+
+                        if( t1.getName().equals("void"))
+                            parser.report_semantic_error("Variable <" + n1 +  "> no se puede declarar tipo void",linea,columna);
+                         else{
                                       boolean meter =parser.tmp_tipo.agregar_atributos(n1,t1);
                                      if(!meter) parser.report_semantic_error("No se puede agregar atributo de nombre " + n1 + " ya existe en este contexto",linea,columna);
-                      
+                       }
                    }
         :}
                 | error {: if(!parser.first_time) parser.report_error("Se esperaba <id> As <tipo> ",sym.ERROR); :};

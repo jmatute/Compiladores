@@ -52,6 +52,19 @@ class Tipo{
       tmp +=   "---->" + this.metodo_var.get( metodo_var.size() -1).toString() ;
       return tmp;
     }
+    else if(this.TipoFinal == 2){
+      StringBuffer sb = new StringBuffer();
+      sb.append(name + ":");
+      for( int i = 0; i < this.metodo_var.size() - 1; i++){
+        sb.append( this.metodo_var.get(i).toString());
+        sb.append("x");
+      }
+      String tmp = sb.toString();
+      tmp = tmp.substring(0,tmp.length()-1);
+      tmp +=   "---->" + this.metodo_var.get( metodo_var.size() -1).toString() ;
+      return tmp;
+
+    }
     else{
         String cad = name + ": record(" ;
         StringBuffer sb = new StringBuffer();

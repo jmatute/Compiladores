@@ -65,6 +65,7 @@ class Main {
        seen_types.put("integer",new Tipo("integer"));
        seen_types.put("variant",new Tipo("variant"));
        seen_types.put("error", new Tipo("error"));
+       seen_types.put("void",new Tipo("void"));
   }
 
 
