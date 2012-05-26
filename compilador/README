@@ -1,0 +1,14 @@
+Proyecto de compiladores
+
+# hagan un fork del repositorio
+# tambien java_cup no se encuentra dentro del codigo puesto, pueden 
+# agregarlo al class_path para compilarlo
+
+# se debe crear la gui
+
+# si les parece mejor utilizar netbeans, usenlo. 
+# PERO sepan usarlo. Me pareceria mejor que lo hicieramos sin utilizar IDEs
+# al menos, si utilizan las herramientas para crear la GUI en NETBEANS 
+# sepan que estan haciendo. 
+
+# todo cambio debe estar documentado del motivo de que se hizo.

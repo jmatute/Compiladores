@@ -1,0 +1,17 @@
+Instruccion 0: ETIQ	func_main		
+Instruccion 1: ASIG_OFFSET	5	4	d
+Instruccion 2: GET_OFFSET	d	4	_t1
+Instruccion 3: +	_t1	3	_t2
+Instruccion 4: ASIG_OFFSET	_t2	0	d
+Instruccion 5: *	5	3	_t3
+Instruccion 6: +	_t3	2	_t4
+Instruccion 7: -	_t4	4	_t5
+Instruccion 8: PARAM	_t5		
+Instruccion 9: NOT	true		_t6
+Instruccion 10: or	_t6	false	_t7
+Instruccion 11: and	true	_t7	_t8
+Instruccion 12: PARAM	_t8		
+Instruccion 13: CALL	esta		
+Instruccion 14: RET			
+Instruccion 15: ETIQ	func_esta		
+Instruccion 16: RET			
