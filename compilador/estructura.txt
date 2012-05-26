@@ -1,6 +1,0 @@
-type empleado
-  dim nombre as integer
-  dim sueldo as Boolean
-end type
-
-dim b as empleado
